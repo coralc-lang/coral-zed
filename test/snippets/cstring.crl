@@ -1,0 +1,5 @@
+u32 f(u8* buf, u32 n) {
+    snprintf(buf, 32u, C"sel2br%u", n);
+    i32 fd = open(C"/dev/urandom", O_RDONLY, 0);
+    return 0;
+}

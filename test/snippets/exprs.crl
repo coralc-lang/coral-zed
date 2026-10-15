@@ -1,0 +1,39 @@
+void exprs() {
+    u32 a = b + c * d - e / f % g;
+    bool t = x < y && y <= z || p != q && r == s;
+    u8 m = bits | 1 ^ 2 & 3;
+    u32 s = v << 2 >> 1;
+    bool n = !flag;
+    u32 nn = ~bits;
+    i32 neg = -v;
+    u8 deref = *ptr;
+    rawptr addr = &value;
+    ++counter;
+    counter--;
+    --other;
+
+    u64 r1 = obj.field;
+    u64 r2 = obj->field;
+    u64 r3 = list[i];
+    u64 r4 = obj.method(args);
+    u64 r5 = ns::obj.method(args);
+    u64 r6 = v as usize;
+
+    u32 c = a > b ? a : b;
+    var p = Point { .x = 1.0, .y = 2.0 };
+    var opt = Type::Some { .field = x };
+    u8[3] arr = [1, 2, 3];
+    var tup = (1, 2, 3);
+
+    usize sz = sizeof(u32);
+    usize al = alignof(u64);
+    u32 ty = typeof(x);
+    assert(ok);
+    assertOut(ok, msg);
+
+    @assert(sz == 4)
+    u32 good = 3;
+
+    a += 1; a -= 1; a *= 2; a /= 2; a %= 2;
+    a |= 1; a &= 1; a ^= 1; a <<= 1; a >>= 1;
+}

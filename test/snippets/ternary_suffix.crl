@@ -1,0 +1,5 @@
+usize plen() {
+    usize l = path.len < 4095u ? path.len : 4095u;
+    u32 v = a > b ? 1u : 0u;
+    return l + (usize)v;
+}

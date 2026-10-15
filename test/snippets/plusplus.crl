@@ -1,0 +1,1 @@
+void f(u32 n) { self.unnamedCounter++; ++self.unnamedCounter; n--; self.a += 1; self.b -= 2; }

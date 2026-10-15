@@ -1,0 +1,23 @@
+id = "coral"
+name = "Coral"
+version = "0.2.0"
+schema_version = 1
+description = "Coral programming language support - syntax highlighting, outline view, bracket matching, indentation."
+repository = "https://github.com/coral-lang/coral-zed"
+authors = ["Coral Contributors"]
+themes = []
+icon_themes = []
+languages = ["languages/coral"]
+capabilities = []
+
+[lib]
+kind = "Rust"
+version = "0.6.0"
+
+[language_servers]
+
+[context_servers]
+
+[slash_commands]
+
+[debug_adapters]

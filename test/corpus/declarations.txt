@@ -1,0 +1,331 @@
+//--- Declarations: modifiers, keyword decls, func/var (grammar.md §2, §5, §6)
+
+pub struct Point<T> {
+    f32 x;
+    f32 y;
+    T payload;
+}
+
+pub struct Counter {
+    usize value;
+
+    usize get() const {
+        return self->value;
+    }
+
+    static Counter new() {
+        return Counter { .value = 0 };
+    }
+}
+
+variant Option<T> {
+    Some { T value },
+    None,
+}
+
+pub extend<T> Option<T> {
+    T unwrap() {
+        if (self is Some) {
+            return self.value;
+        }
+        return 0;
+    }
+}
+
+union Word {
+    u64 bits;
+    bool flag;
+}
+
+enum Color { Red, Green, Blue = 5 }
+
+trait Comparable {
+    bool less(T other);
+    bool equals(T other) const;
+}
+
+extend Shape : Comparable {
+    u32 area() const;
+}
+
+// const / typedef / distinct
+const usize MAX = 128;
+pub const u8 bytes[4] = { 1, 2, 3, 4 };
+
+pub typedef Id = u32;
+
+pub distinct Handle = rawptr;
+
+// import: all four legal forms
+import name { sym1, sym2 };
+import mod::sub { syms };
+import(lib) std::x { syms };
+import(lib) std;
+
+pub mod name = import std::text:write;
+
+// functions: static, extern, variadic, unnamed params
+u32 add(u32 a, u32 b) {
+    return a + b;
+}
+
+pub static u32 twice(u32 v) { return v * 2; }
+
+extern("C") void free(rawptr ptr);
+
+extern("C") i32 printf(u8* fmt, ...);
+
+u32 hf(usize(K) hf, u8 raw) {
+    return 0;
+}
+
+pub extern[c] someSymbol;
+
+static Color pick() {
+    return Color::Red;
+}
+
+// local decls: `Type name = expr;` and `var name = expr;`
+void locals() {
+    u8 tmp[72];
+    u8 buf[4] = { 0, 1, 2, 3 };
+    u64 total = 0;
+    var inferred = total + 1;
+    u8* p = null;
+    const u8* cp = p;
+    f64 d = 3.14f;
+}
+
+// array decl with a const-size expr declared later
+u8 table[MAX];
+
+//--- Attributes (grammar.md §2)
+
+#[[no_drop_all]]
+pub lib file {}
+
+#[[packed]]
+struct Packed {
+    u8 a;
+    u64 b;
+}
+
+#[[reorder, packed]]
+struct Both {
+    u8 a;
+    u32 b;
+}
+
+#[[inline]]
+void inlineIt() {}
+
+#[[const]]
+void pure(u32 a) u32;
+
+void maybePure(u32 a) u32 const {
+    return a;
+}
+
+#[[threadlocal]]
+static u32 tlsValue = 1;
+
+#[[noalias]]
+void noaliasArg(u8* p) {}
+
+#[[condassign]]
+u32 check(u32 v) {
+    if (v = 1) {
+        return 1;
+    }
+    return 0;
+}
+
+#[[fallthrough]]
+void sw(u32 v) {
+    switch (v) {
+        1 => { break },
+        2 => { u32 x = 1; },
+    }
+}
+
+#[[generate(Drop, Eq)]]
+struct Generated {
+    u32 a;
+}
+
+//--- Types (grammar.md §3, §4)
+
+// prefixes
+const u8 a1;
+comptime u32 a2;
+const u8* a3;
+
+// fn-ptr over a base, with and without a name
+void(u64) cb1;
+u32(rawptr) cb2;
+bool(T, T) less;
+
+// pointers / arrays / slices
+u8* p1;
+u8** p2;
+u8 buf[8];
+u8 slice[];
+Option<u8> o1;
+HashMap<K, V> m1;
+
+any Comparable anyObj;
+
+// tuple types
+struct(u8, u32) t1;
+(u8, u32) t2;
+
+// str
+str s1;
+
+//--- Statements (grammar.md §7)
+
+void stmts() {
+    // C-style for
+    for (u32 i = 0; i < 10; i++) {
+        continue;
+    }
+
+    // range-based for
+    for (u32 j : range) {
+        break;
+    }
+
+    // destructuring range-based for
+    for (const u8 [ k, v ] : pairs) {
+        var ignore = k;
+    }
+
+    // for with `var`
+    for (var it : items) {
+        continue;
+    }
+
+    // if / else, while, switch as expressions
+    u32 r = if (x > 1) { 1 } else { 2 };
+
+    while (x < 5) {
+        x += 1;
+    }
+
+    loop {
+        break;
+    }
+
+    switch (x) {
+        Color::Red => { u32 a = 1; },
+        Some { value } => { u32 b = value; },
+        _ => { u32 c = 0; },
+        else => { u32 d = 9; },
+    }
+
+    // defer / asm / return
+    defer release();
+    asm "nop" { outputs }
+    return;
+}
+
+//--- Expressions & precedence (grammar.md §8, §9, §10)
+
+void exprs() {
+    u32 a = b + c * d - e / f % g;
+    bool t = x < y && y <= z || p != q && r == s;
+    u8 m = bits | 1 ^ 2 & 3;
+    u32 s = v << 2 >> 1;
+    bool n = !flag;
+    u32 nn = ~bits;
+    i32 neg = -v;
+    u8 deref = *ptr;
+    rawptr addr = &value;
+    ++counter;
+    counter--;
+    --other;
+
+    // postfix
+    u64 r1 = obj.field;
+    u64 r2 = obj->field;
+    u64 r3 = list[i];
+    u64 r4 = obj.method(args);
+    u64 r5 = ns::obj.method(args);
+    u64 r6 = v as usize;
+
+    // conditional
+    u32 c = a > b ? a : b;
+
+    // struct literal with `.field = x`
+    var p = Point { .x = 1.0, .y = 2.0 };
+    var opt = Type::Some { .field = x };
+
+    // array / tuple literals
+    u8[3] arr = [1, 2, 3];
+    var tup = (1, 2, 3);
+
+    // builtin identifiers
+    usize sz = sizeof(u32);
+    usize al = alignof(u64);
+    u32 ty = typeof(x);
+    assert(ok);
+    assertOut(ok, msg);
+
+    // compile-time attrs
+    @isFormatLiteral
+    u32 fmt = 1;
+    @compileError("nope")
+    u32 bad = 2;
+    @assert(sz == 4)
+    u32 good = 3;
+
+    // assignment operators
+    a += 1;
+    a -= 1;
+    a *= 2;
+    a /= 2;
+    a %= 2;
+    a |= 1;
+    a &= 1;
+    a ^= 1;
+    a <<= 1;
+    a >>= 1;
+}
+
+//--- comptime semantics (grammar.md, observed in std)
+
+// `comptime T` means T is deduced from the function's comptime block.
+print<comptime T>(T fmt, usize len) {
+    comptime {
+        switch (fmt) {
+            "u8" => { T = u8; },
+            "u32" => { T = u32; },
+        }
+    }
+}
+
+u32 comptIf<comptime K>(K key) {
+    comptime {
+        for (u32 i = 0; i < 4; i++) {
+            switch (i) {
+                1 => { K = u8; },
+                else => { K = u32; },
+            }
+        }
+    }
+    return 0;
+}
+
+//--- Imports: nested path-listed items (decided form)
+
+import(lib) std::text {
+    string::{ String },
+    strutil::{ splitVec, trim, indexOfChar }
+};
+
+import std::io {
+    write,
+    println,
+};
+
+import nested::deep::path;

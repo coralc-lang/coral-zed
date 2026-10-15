@@ -1,0 +1,3 @@
+pub extern i32 send(rawptr s, const cchar* buf, i32 len, i32 flags);
+pub extern(c) i32 open(const cchar* path, i32 flags, i32 mode);
+extern void puts(const cchar* s);

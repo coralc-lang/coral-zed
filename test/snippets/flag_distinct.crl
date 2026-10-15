@@ -1,0 +1,1 @@
+pub distinct cchar = flag (arch) { x86_64 => { i8 }, else => { u8 } };

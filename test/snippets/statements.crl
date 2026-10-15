@@ -1,0 +1,30 @@
+void stmts() {
+    u8 tmp[72];
+    u64 total = 0;
+    var inferred = total + 1;
+    u8 buf[4] = { 0, 1, 2, 3 };
+    const u8* cp = null;
+    f64 d = 3.14f;
+
+    for (u32 i = 0; i < 10; i++) { continue; }
+    for (u32 j : range) { break; }
+    for (const u8 [ k, v ] : pairs) { var ig = k; }
+    for (var it : items) { x = it; }
+    for (;;) { break; }
+
+    if (x > 1) { x = 1; } else { x = 2; }
+    while (x < 5) { x += 1; }
+    loop { break; }
+
+    switch (x) {
+        Color::Red => { u32 a = 1; },
+        Some { value } => { u32 b = value; },
+        3 => { u32 c = 0; },
+        _ => { u32 d = 9; },
+        else => { u32 e = 7; },
+    }
+
+    defer release();
+    asm "nop" { out }
+    return;
+}

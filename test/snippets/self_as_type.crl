@@ -1,0 +1,2 @@
+struct SP { const T* constData(const self*); }
+struct SP2 { T* data(self*); }

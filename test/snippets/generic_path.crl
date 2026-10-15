@@ -1,0 +1,8 @@
+void m() {
+    var d = deque::Deque<T>::new();
+    var h = HashMap<K, V>::new(hf, ef);
+    self = Option<T>::Some { .value = fn(value) };
+    var l = String::from(name);
+    var x = libc::strlen(cstr);
+    usize i = Vec::cap();
+}

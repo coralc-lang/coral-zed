@@ -1,0 +1,34 @@
+{
+  "name": "coral",
+  "version": "0.2.0",
+  "description": "Coral programming language grammar for tree-sitter",
+  "grammars": [
+    {
+      "name": "coral",
+      "camelCase": "Coral",
+      "scope": "source.coral",
+      "path": ".",
+      "file-types": ["crl", "coral"],
+      "highlights": "../languages/coral/highlights.scm",
+      "injections": "../languages/coral/injections.scm"
+    }
+  ],
+  "metadata": {
+    "version": "0.2.0",
+    "license": "MIT",
+    "authors": [
+      { "name": "Coral Contributors" }
+    ],
+    "links": {
+      "repository": "https://github.com/coral-lang/tree-sitter-coral"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "rust": false,
+    "node": false,
+    "python": false,
+    "go": false,
+    "swift": false
+  }
+}

@@ -1,0 +1,17 @@
+const u8 a1;
+comptime u32 a2;
+const u8* a3;
+u8* p1;
+u8** p2;
+u8 buf[8];
+u8 slice[];
+Option<u8> o1;
+HashMap<K, V> m1;
+(u8, u32) t2;
+str s1;
+void(u64) cb1;
+u32(rawptr) cb2;
+bool(T, T) less;
+any Comparable c;
+const u8** cp;
+u8 grid[4][4];

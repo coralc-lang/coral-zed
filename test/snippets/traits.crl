@@ -1,0 +1,7 @@
+trait Comparable { bool less<T>(T other); bool eq<T>(T other) const; }
+extend Shape : Comparable<i32> { u32 area() const; }
+pub extend<T> Option<T> { T unwrap() { return 0; } }
+variant Option<T> { Some { T value }, None, }
+enum Color { Red, Green, Blue = 5 }
+union Word { u64 bits; bool flag; }
+struct Counter { usize v; usize get() const { return self->v; } static Counter new() { return; } }

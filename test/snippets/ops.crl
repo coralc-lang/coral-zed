@@ -1,0 +1,7 @@
+bool f(bool a, bool b, u32 x) {
+    bool c = a && b;
+    bool d = a || b;
+    bool e = !(a && b) || !c;
+    u32 y = x % 3u;
+    return c && d || e;
+}

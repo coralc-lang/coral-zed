@@ -1,0 +1,8 @@
+// static, extern, variadic, unnamed params, fn-ptr params
+u32 plain(u32 a) { return a; }
+pub static u32 twice(u32 v) { return v * 2; }
+extern("C") i32 printf(u8* fmt, ...);
+u32 hf(usize(K) hf, u8 raw) { return 0; }
+void noblock(u32 a, u32 b);
+u32 constFn(u32 a) const { return a; }
+print<comptime T>(T fmt, usize len) { comptime { switch (fmt) { _ => {}, } } }

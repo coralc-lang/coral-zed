@@ -1,0 +1,32 @@
+; Indentation rules for coral.
+; Asymmetric indent: `{` opens a level, `}` dedents to the opener's indent.
+
+[
+  (struct_declaration)
+  (variant_declaration)
+  (union_declaration)
+  (enum_declaration)
+  (trait_declaration)
+  (extend_declaration)
+  (function_declaration)
+  (generic_function_declaration)
+  (method_declaration)
+  (constructor_declaration)
+  (block)
+  (if_statement)
+  (if_expression)
+  (for_statement)
+  (while_statement)
+  (loop_statement)
+  (switch_statement)
+  (switch_expression)
+  (comptime_block)
+  (initializer_list)
+  (struct_literal)
+  (tuple_expression)
+  (parenthesized_expression)
+  (parameters)
+  (arguments)
+  (import_list)
+  (flag_type)
+] @indent

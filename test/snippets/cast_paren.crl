@@ -1,0 +1,10 @@
+u16 cvt(u8 c, rawptr dst, const u8* cstr, usize n) {
+    u16 v = (u16)c;
+    u8* d = (u8*)dst;
+    const u8* e = (const u8*)cstr;
+    usize m = (usize)n;
+    T* p = (T*)self.data;
+    rawptr r = (rawptr)buf;
+    i64 k = (i64)v;
+    return v;
+}

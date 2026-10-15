@@ -1,0 +1,14 @@
+import name { sym1, sym2 };
+import mod::sub { syms };
+import(lib) std::x { syms };
+import(lib) std;
+pub mod name = import std::text:write;
+import nested::deep::path;
+import(lib) std::text {
+    string::{ String },
+    strutil::{ splitVec, trim, indexOfChar }
+};
+import std::io {
+    write,
+    println,
+};

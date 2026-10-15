@@ -1,0 +1,4 @@
+#[[inline]]
+fn f() {}
+#[[inline]] #[[hot]]
+fn g() {}

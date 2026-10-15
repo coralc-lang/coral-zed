@@ -1,0 +1,23 @@
+u32 n() {
+    u32 a = 127;
+    u32 b = 0xFF;
+    u32 c = 0b1010;
+    u32 d = 0o17;
+    u32 e = 1_000;
+    u32 f = 32u;
+    u64 g = 5ull;
+    f64 h = 1e5;
+    f64 i = 3.14f;
+    f64 j = 2.5e-3;
+    str s = "a\tb";
+    str t = "line";
+    char c1 = 'a';
+    char c2 = '\n';
+    str raw1 = R"(raw)";
+    str raw2 = R"tag(ra)w)";
+    bool b1 = true;
+    bool b2 = false;
+    void* p = null;
+    self;
+    return 0;
+}

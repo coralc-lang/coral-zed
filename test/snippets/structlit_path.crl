@@ -1,0 +1,9 @@
+void m() {
+    var o = Option<T>::Some { .value = fn(value) };
+    self = Result<T, E>::Err { .error = e };
+    var lg = Logger { String::from(name), .minLevel = minLevel };
+    var lg2 = Logger {
+        String::from(name),
+        .minLevel = minLevel,
+    };
+}

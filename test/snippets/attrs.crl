@@ -1,0 +1,19 @@
+#[[no_drop_all]]
+#[[packed]]
+struct Packed { u8 a; u64 b; }
+#[[reorder, packed]]
+struct Both { u8 a; u32 b; }
+#[[inline]]
+void inlineIt() {}
+#[[const]]
+void pure(u32 a) {}
+#[[threadlocal]]
+static u32 tlsValue = 1;
+#[[noalias]]
+void na(u8* p) {}
+#[[condassign]]
+u32 chk(u32 v) { if (v = 1) { return 1; } return 0; }
+#[[generate(Drop, Eq)]]
+struct G { u32 a; }
+#[[fallthrough]]
+void sw(u32 v) { switch (v) { 1 => { break }, 2 => { var x = 1; }, } }

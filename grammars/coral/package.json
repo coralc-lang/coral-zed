@@ -1,0 +1,15 @@
+{
+  "name": "coral",
+  "version": "0.2.0",
+  "description": "Coral programming language grammar for tree-sitter",
+  "main": "bindings/node",
+  "keywords": ["coral", "language"],
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "build": "tree-sitter build",
+    "test": "tree-sitter test",
+    "parse": "tree-sitter parse"
+  },
+  "repository": "https://github.com/coral-lang/tree-sitter-coral",
+  "license": "MIT"
+}
