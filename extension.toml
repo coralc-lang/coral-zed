@@ -12,7 +12,7 @@ capabilities = []
 
 [grammars.coral]
 repository = "file:///home/cerie/Documents/coral-zed"
-rev = "b89b3bf6740b5d308dc242d2b71a820d30fbf994"
+rev = "cb82925261eb4445a0fdcc581982cf9c5203f863"
 path = "grammars/coral"
 
 [language_servers]
