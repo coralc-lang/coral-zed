@@ -1,5 +1,3 @@
-node_modules/
 *.o
 *.so
-!grammars/coral/coral.so
-build/
+node_modules/

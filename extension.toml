@@ -10,9 +10,10 @@ icon_themes = []
 languages = ["languages/coral"]
 capabilities = []
 
-[lib]
-kind = "Rust"
-version = "0.6.0"
+[grammars.coral]
+repository = "file:///home/cerie/Documents/coral-zed"
+rev = "b89b3bf6740b5d308dc242d2b71a820d30fbf994"
+path = "grammars/coral"
 
 [language_servers]
 

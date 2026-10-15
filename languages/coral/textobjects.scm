@@ -1,6 +1,4 @@
-; Text objects for coral — `ai`-style selection.
-; These use plain node patterns; `body` field names are not declared in
-; grammar.js for cry.
+; Text objects for coral — used by vim mode's af/if/ac/ic motions.
 
 (function_declaration) @function.around
 (function_declaration (block) @function.inside)
@@ -17,9 +15,7 @@
 (union_declaration) @class.around
 (enum_declaration) @class.around
 (trait_declaration) @class.around
+(extend_declaration) @class.around
 
-(parameter
-  (identifier) @parameter.inside) @parameter.around
-
-(comment) @comment.around
+(comment)+ @comment.around
 (comment) @comment.inside
