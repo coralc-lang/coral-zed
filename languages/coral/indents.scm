@@ -1,32 +1,44 @@
-; Indentation rules for coral.
-; Asymmetric indent: `{` opens a level, `}` dedents to the opener's indent.
+; Auto-indentation for coral.
+;
+; Only brace-delimited containers open an indent level. The declaration
+; nodes that *contain* those braces (function_declaration,
+; struct_declaration, if_statement, …) must NOT be captured as well, or the
+; body gets indented twice.
+;
+; Capturing the whole node means the range runs from the node's start to its
+; end, so anything with a dedicated body node is captured via that body node;
+; constructs whose braces sit inline use @start / @end instead.
 
 [
-  (struct_declaration)
-  (variant_declaration)
-  (union_declaration)
-  (enum_declaration)
-  (trait_declaration)
-  (extend_declaration)
-  (function_declaration)
-  (generic_function_declaration)
-  (method_declaration)
-  (constructor_declaration)
   (block)
-  (if_statement)
-  (if_expression)
-  (for_statement)
-  (while_statement)
-  (loop_statement)
-  (switch_statement)
-  (switch_expression)
-  (comptime_block)
+  (struct_body)
+  (variant_fields)
   (initializer_list)
   (struct_literal)
-  (tuple_expression)
-  (parenthesized_expression)
-  (parameters)
-  (arguments)
   (import_list)
-  (flag_type)
+  (flag_case)
 ] @indent
+
+(enum_declaration
+  "{" @start
+  "}" @end) @indent
+
+(variant_declaration
+  "{" @start
+  "}" @end) @indent
+
+(trait_declaration
+  "{" @start
+  "}" @end) @indent
+
+(flag_declaration
+  "{" @start
+  "}" @end) @indent
+
+(flag_type
+  "{" @start
+  "}" @end) @indent
+
+; Sibling switch cases stay aligned with each other.
+(switch_statement
+  (case_clause)+ @outdent)

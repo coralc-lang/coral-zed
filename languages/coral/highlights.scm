@@ -19,8 +19,10 @@
 (compile_attr) @attribute
 (compile_attr name: (identifier) @attribute)
 ; ── Literals ──
+; `C"…"` is a C string (NUL-terminated, no length prefix), so it gets its
+; own scope instead of sharing @string with coral strings.
 (string_literal) @string
-(c_string) @string
+(c_string) @string.special
 (raw_string) @string
 (char_literal) @character
 (number_literal) @number
@@ -171,7 +173,7 @@
 (unary_expression operator: _ @operator)
 (postfix_expression operator: _ @operator)
 (binary_expression) @operator
-(assignment_statement operator: _ @operator)
+(assignment_expression operator: _ @operator)
 (comparison_expression) @operator
 (conditional_expression) @operator
 

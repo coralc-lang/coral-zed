@@ -33,6 +33,29 @@ wasm-ld -shared "$ROOT/coral-wasm.o" -o "$ROOT/grammars/coral.wasm" \
 rm -f "$ROOT/coral-wasm.o"
 test -s "$ROOT/grammars/coral.wasm" || { echo 'wasm build failed'; exit 1; }
 
+echo '== verify queries'
+# A broken query makes Zed fail to load the language at all, so nothing gets
+# highlighted. Validate every query against real coral source before
+# installing, and refuse to ship a bad one.
+PROBE=/home/cerie/Documents/coralc/lib/std/x86_64/linux/collections/arr.crl
+if [ ! -f "$PROBE" ]; then
+  PROBE=/tmp/.__coral_probe.crl
+  printf 'pub struct S<T> {\n    #[[inline]]\n    T* ptr() const { return (T*)self.data; }\n}\nvar p = S { .data = null };\nfor (usize i = 0; i < 3; i++) { switch (i) { _ => { break }, else => { continue; }, } }\n' > "$PROBE"
+fi
+for q in brackets highlights indents outline textobjects; do
+  printf '   %-16s' "$q.scm"
+  # `tree-sitter query` resolves the grammar from the current directory.
+  if ( cd "$G" && tree-sitter query "$ROOT/languages/coral/$q.scm" "$PROBE" ) \
+       >/dev/null 2>/tmp/.__coral_qerr; then
+    echo OK
+  else
+    echo 'FAIL - refusing to install'
+    head -6 /tmp/.__coral_qerr
+    exit 1
+  fi
+done
+rm -f /tmp/.__coral_probe.crl /tmp/.__coral_qerr
+
 echo '== install'
 mkdir -p "$DST"
 rsync -a --delete \

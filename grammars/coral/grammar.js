@@ -108,6 +108,19 @@ module.exports = grammar({
     [$.const_declaration, $._expression],
     [$.const_declaration, $.comptime_type],
     [$.const_declaration, $.const_type, $.named_type],
+    [$.local_declaration, $.field_declaration],
+    [$.local_declaration, $.method_declaration],
+    [$.local_declaration, $.function_declaration],
+    [$.local_declaration, $.variable_declaration],
+    [$.local_declaration, $.constructor_declaration],
+    [$.local_declaration, $.const_declaration],
+    [$.local_declaration, $._expression],
+    [$.assignment_statement, $._for_init],
+    [$.assignment_statement, $.assignment_expression],
+    [$._for_init, $.assignment_statement],
+    [$.local_declaration, $._for_init],
+    [$._for_init, $._expression],
+    [$.local_declaration, $.array_type],
     [$.field_declaration, $.variable_declaration],
     [$.field_declaration, $.function_declaration],
     [$.field_declaration, $.method_declaration],
@@ -236,7 +249,9 @@ module.exports = grammar({
       field('name', $.identifier),
       '=',
       'import',
-      $.module_path,
+      // A `::` module path, or a quoted file path (`import "arena"`).
+      field('source', choice($.module_path, $.string_literal)),
+      optional($.import_list),
       optional(seq(':', $.import_list)),
       ';',
     ),
@@ -248,7 +263,7 @@ module.exports = grammar({
     import_declaration: $ => seq(
       'import',
       optional(seq('(', field('lib', $.identifier), ')')),
-      $.module_path,
+      field('source', choice($.module_path, $.string_literal)),
       optional(seq('::', $.import_list)),
       optional($.import_list),
       ';',
@@ -279,6 +294,15 @@ module.exports = grammar({
       $.constructor_declaration,
       $.comptime_block,
       $.statement,
+    ),
+
+    // Local declaration: `Type name = expr;` / `Type name;` /
+    // `Type name[N];`  (initialiser optional).
+    local_declaration: $ => seq(
+      optional('volatile'),
+      $._typed_decl_head,
+      optional(seq('=', choice($._expression, $.initializer_list))),
+      ';',
     ),
 
     // Fields: `Type name;` / `Type name[N];` (const-size declarators).
@@ -687,7 +711,7 @@ module.exports = grammar({
     block: $ => seq('{', repeat($.statement), '}'),
 
     statement: $ => choice(
-      $.field_declaration,
+      $.local_declaration,
       $.var_declaration,
       $.const_declaration,
       $.flag_declaration,
@@ -734,13 +758,15 @@ module.exports = grammar({
       'for',
       '(',
       choice(
+        // C-style: `for (init; cond; inc) { … }`
         seq(
-          optional(choice($.field_declaration, $.assignment_statement, $.expression_statement)),
+          optional($._for_init),
           ';',
           optional($._expression),
           ';',
           optional($._expression),
         ),
+        // Range-based: `for (const Type/var name : iterable) { … }`
         seq(
           optional('const'),
           choice('var', $._type),
@@ -751,6 +777,18 @@ module.exports = grammar({
       ),
       ')',
       $.statement,
+    ),
+
+    // A `for` init/inc clause — same as a declaration or assignment,
+    // but without its own terminating `;`.
+    _for_init: $ => choice(
+      $.assignment_expression,
+      seq(
+        optional('volatile'),
+        $._typed_decl_head,
+        optional(seq('=', choice($._expression, $.initializer_list))),
+      ),
+      $._expression,
     ),
 
     _for_binding: $ => choice(
@@ -807,13 +845,18 @@ module.exports = grammar({
     comptime_block: $ => prec.right(seq('comptime', $.block)),
 
     // `=, +=, -=, *=, /=, %=` are separate assign statements.
-    assignment_statement: $ => prec.right(seq(
+    // `=, +=, -=, *=, /=, %=` are separate assign expressions.
+    assignment_expression: $ => prec.right(seq(
       field('left', $._expression),
       field('operator', choice(
         '=', '+=', '-=', '*=', '/=', '%=',
         '|=', '&=', '^=', '~=', '<<=', '>>=',
       )),
       field('right', $._expression),
+    )),
+
+    assignment_statement: $ => prec.right(seq(
+      $.assignment_expression,
       ';',
     )),
 
