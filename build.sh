@@ -21,7 +21,20 @@ printf '#define assert(e) ((void)0)\n' > "$INC/assert.h"
 printf '#include <stddef.h>\ntypedef struct _FILE FILE;\n' > "$INC/stdio.h"
 
 # grammar.js -> parser.c
-(cd "$G" && tree-sitter generate) || exit 1
+#
+# tree-sitter can exit 0 while leaving src/parser.c STALE when grammar.js has
+# an undefined symbol or a JS error — it prints the problem and skips codegen.
+# That silently tests the previous grammar, so check the output as well as the
+# exit status.
+gen=$( cd "$G" && tree-sitter generate 2>&1 )
+rc=$?
+if [ $rc -ne 0 ] || echo "$gen" | grep -qiE 'ReferenceError|TypeError|SyntaxError|Failed to load grammar|Unresolved conflict'; then
+  echo "$gen" | grep -vE '^\s*`' | head -20
+  echo 'GENERATE FAILED - src/parser.c left stale'
+  exit 1
+fi
+echo "$gen" | grep -E 'unnecessary conflict' \
+  | sed 's/^ *//;s/`//g' | sort -u | head -30
 
 echo '== clang -> wasm object'
 clang --target=wasm32-unknown-unknown -fPIC -O2 -fno-builtin \

@@ -2483,10 +2483,6 @@
           "named": true
         },
         {
-          "type": "expression_statement",
-          "named": true
-        },
-        {
           "type": "extend_declaration",
           "named": true
         },
@@ -7094,6 +7090,10 @@
       "required": true,
       "types": [
         {
+          "type": "case_clause",
+          "named": true
+        },
+        {
           "type": "comptime_block",
           "named": true
         },
@@ -7107,10 +7107,6 @@
         },
         {
           "type": "method_declaration",
-          "named": true
-        },
-        {
-          "type": "statement",
           "named": true
         }
       ]
@@ -8388,7 +8384,18 @@
   {
     "type": "variadic_parameter",
     "named": true,
-    "fields": {}
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
   },
   {
     "type": "variant_declaration",

@@ -254,7 +254,6 @@ module.exports = grammar({
       $.variable_declaration,
       $.var_declaration,
       $.comptime_block,
-      $.expression_statement,
     ),
 
     // `pub mod name = import path[:symbols];`
@@ -279,6 +278,7 @@ module.exports = grammar({
       'import',
       optional(seq('(', field('lib', $.identifier), ')')),
       field('source', choice($.module_path, $.string_literal)),
+      // `import m::{ a, b }` and `import std::x { syms }`
       optional(seq('::', $.import_list)),
       optional($.import_list),
       ';',
@@ -289,6 +289,8 @@ module.exports = grammar({
     import_symbol: $ => choice(
       field('name', $.identifier),
       seq($.module_path, optional($.import_list)),
+      // `mod::{ a, b }` — the decided nested form
+      seq(field('name', $.identifier), '::', $.import_list),
       $.import_list,
     ),
 
@@ -306,12 +308,16 @@ module.exports = grammar({
       '}',
     ),
 
+    // Match arms (`Variant { … } => { … }`) live in struct bodies, so a
+    // statement is allowed — but a bare expression statement would let
+    // `Foo::Bar* f()` parse as an expression, so only the shapes that
+    // actually appear are listed.
     struct_member: $ => choice(
       $.field_declaration,
       $.method_declaration,
       $.constructor_declaration,
       $.comptime_block,
-      $.statement,
+      $.case_clause,
     ),
 
     // Local declaration: `Type name = expr;` / `Type name;` /
@@ -656,7 +662,7 @@ module.exports = grammar({
       $.parameters,
     )),
 
-    pointer_type: $ => prec.right(seq($._type, '*')),
+    pointer_type: $ => prec.right(12, seq($._type, '*')),
 
     // `T[N]` → array
     array_type: $ => prec.right(seq(
@@ -718,7 +724,10 @@ module.exports = grammar({
     )),
 
     // `mod::sub::Name`
-    qualified_type: $ => prec.right(seq(
+    // prec 1 so a trailing `*` binds to the whole qualified type:
+    // `Foo::Bar* f()` must be a function returning `Foo::Bar*`, not an
+    // expression statement `Foo::Bar` followed by a call to `*`.
+    qualified_type: $ => prec.right(1, seq(
       $.identifier,
       repeat1(seq('::', $.identifier)),
     )),
@@ -750,7 +759,8 @@ module.exports = grammar({
       optional(field('name', $.identifier)),
     ),
 
-    variadic_parameter: $ => '...',
+    // `...` may be named: `pub void vaprint(... args)`.
+    variadic_parameter: $ => seq('...', optional(field('name', $.identifier))),
 
     // ══════════════════════════════════════════════════════════════════
     // 6. Statements
