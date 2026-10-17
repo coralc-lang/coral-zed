@@ -109,6 +109,10 @@ module.exports = grammar({
     [$.const_declaration, $.comptime_type],
     [$.const_declaration, $.const_type, $.named_type],
     [$.local_declaration, $.field_declaration],
+    [$.local_declaration, $.declarator],
+    [$.field_declaration, $.declarator],
+    [$.method_declaration, $.declarator],
+    [$.function_declaration, $.declarator],
     [$.local_declaration, $.method_declaration],
     [$.local_declaration, $.function_declaration],
     [$.local_declaration, $.variable_declaration],
@@ -297,19 +301,31 @@ module.exports = grammar({
     ),
 
     // Local declaration: `Type name = expr;` / `Type name;` /
-    // `Type name[N];`  (initialiser optional).
+    // `Type name[N];`, with C-style multiple declarators:
+    // `u32 a = 0, b = 0;`  (each declarator may repeat the type).
     local_declaration: $ => seq(
       optional('volatile'),
-      $._typed_decl_head,
-      optional(seq('=', choice($._expression, $.initializer_list))),
+      field('type', $._type),
+      commaSep1($.declarator),
       ';',
+    ),
+
+    declarator: $ => seq(
+      $._declarator_head,
+      optional(seq('=', choice($._expression, $.initializer_list))),
+    ),
+
+    _declarator_head: $ => seq(
+      field('name', $.identifier),
+      optional($._array_declarator),
     ),
 
     // Fields: `Type name;` / `Type name[N];` (const-size declarators).
     field_declaration: $ => seq(
       optional('pub'),
       optional('volatile'),
-      $._typed_decl_head,
+      field('type', $._type),
+      commaSep1($.declarator),
       ';',
     ),
 
@@ -329,8 +345,7 @@ module.exports = grammar({
     // type / name / `[N]` / init / params decision is a single LR choice.
     _typed_decl_head: $ => seq(
       field('type', $._type),
-      field('name', $.identifier),
-      optional($._array_declarator),
+      $._declarator_head,
     ),
 
     // `[N]` / `[N][M]` declarator suffix: `u8 tmp[72];`
@@ -415,7 +430,7 @@ module.exports = grammar({
       'extend',
       optional($.generic_params),
       field('target', $._extend_target),
-      optional(seq(':', field('trait', $._extend_target))),
+      optional(seq(':', field('trait', choice($._extend_target, $.compile_attr)))),
       $.struct_body,
     ),
 
@@ -431,20 +446,34 @@ module.exports = grammar({
     extern_declaration: $ => seq(
       optional('pub'),
       'extern',
-      optional($.extern_convention),
-      optional(field('return', $._type)),
-      field('name', $.identifier),
-      optional($.generic_params),
-      optional($.parameters),
-      optional('const'),
-      optional('...'),
-      choice($.block, ';'),
-    ),
-
-    extern_convention: $ => seq(
-      choice('(', '['),
-      choice('C', 'c'),
-      choice(')', ']'),
+      // The ABI tag is one token. It must beat the `(` that could start a
+      // parameter list and the `"C"` string_literal would otherwise claim, so
+      // it is a token() with high lexical precedence.
+      optional(choice(
+        token(prec(10, /\(\s*"[Cc]"\s*\)/)),
+        token(prec(10, /\(\s*[Cc]\s*\)/)),
+        token(prec(10, /\[\s*[Cc]\s*\]/)),
+        token(prec(10, /\[\s*"[Cc]"\s*\]/)),
+      )),
+      choice(
+        // `extern fn name(params);`  /  `extern name;` (foreign variable)
+        seq(
+          optional(field('return', $._type)),
+          field('name', $.identifier),
+          optional($.generic_params),
+          optional($.parameters),
+          optional('const'),
+          choice($.block, ';'),
+        ),
+        // `extern fn name = ptr;` — a foreign alias bound to a symbol
+        seq(
+          field('type', $._type),
+          field('name', $.identifier),
+          '=',
+          $._expression,
+          ';',
+        ),
+      ),
     ),
 
     // `const Type name = expr;` — the type may be omitted when it is
@@ -525,6 +554,7 @@ module.exports = grammar({
     // bare `Type name;` declaration parses too).
     variable_declaration: $ => seq(
       optional('pub'),
+      optional('static'),
       optional('volatile'),
       $._typed_decl_head,
       optional(seq('=', choice($._expression, $.initializer_list))),
@@ -587,7 +617,7 @@ module.exports = grammar({
     ),
 
     // `const T` → Const(T)
-    const_type: $ => prec.right(seq('const', $._type)),
+    const_type: $ => prec.right(3, seq('const', $._type)),
 
     // `comptime T` → ComptimeT
     comptime_type: $ => prec.right(seq('comptime', $._type)),
@@ -785,8 +815,8 @@ module.exports = grammar({
       $.assignment_expression,
       seq(
         optional('volatile'),
-        $._typed_decl_head,
-        optional(seq('=', choice($._expression, $.initializer_list))),
+        field('type', $._type),
+        commaSep1($.declarator),
       ),
       $._expression,
     ),
@@ -815,16 +845,15 @@ module.exports = grammar({
       ')',
       '{',
       repeat($.case_clause),
-      optional(','),
       '}',
     ),
 
-    case_clause: $ => prec.left(seq(
+    case_clause: $ => seq(
       $.pattern,
       '=>',
       $.statement,
       optional(','),
-    )),
+    ),
 
     break_statement: $ => seq('break', optional(';')),
 
@@ -942,6 +971,7 @@ module.exports = grammar({
       $.field_expression,
       $.deref_field_expression,
       $.index_expression,
+      $.generic_type,
       $.path_expression,
       $.postfix_expression,
       $.unary_expression,
@@ -1006,12 +1036,18 @@ module.exports = grammar({
       ')',
     )),
 
+    // `commaSep` (not commaSepTrail) so `f()` is a call. An empty argument
+    // list used to be reachable only as a function-pointer *type*, which made
+    // `a();` parse as a declaration with a missing name. `...` forwards the
+    // caller's variadic tail: `_printEmit(&out, fmt, ...)`.
     arguments: $ => seq(
       '(',
-      commaSepTrail($._expression),
+      commaSep(choice($._expression, $.variadic_forward)),
       optional(','),
       ')',
     ),
+
+    variadic_forward: $ => '...',
 
     call_expression: $ => prec(21, seq(
       field('function', $._expression),
@@ -1040,7 +1076,7 @@ module.exports = grammar({
     // `ns::Item`, `ns::deep::Item`, `Color::Red`, `Type::Some {
     // .field = x }`
     path_expression: $ => prec(22, seq(
-      $.identifier,
+      choice($.identifier, $.generic_type),
       repeat1(seq('::', $.identifier)),
     )),
 
@@ -1052,9 +1088,12 @@ module.exports = grammar({
 
     // `Name { .field = x }`, `Type::Some { .field = x }`, `Name<T> { … }`
     struct_literal: $ => prec(18, seq(
-      field('name', choice($.identifier, $.generic_type, $.qualified_type)),
+      field('name', choice($.identifier, $.generic_type, $.qualified_type,
+                           $.path_expression)),
       '{',
-      commaSepTrail($.struct_field),
+      // Positional fields as well as `.name = value`: `_Buf { 1, buf, 0 }`
+      // and `AsmRule { IrOpcode::And, "and", … }` both appear in the stdlib.
+      optional(commaSepTrail(choice($.struct_field, $._expression))),
       optional(','),
       '}',
     )),
@@ -1150,11 +1189,15 @@ module.exports = grammar({
       ')',
       '{',
       repeat($.case_clause),
-      optional(','),
       '}',
     ),
   },
 });
+
+// `rule` with at least one occurrence and no trailing comma.
+function commaSep1(rule) {
+  return seq(rule, repeat(seq(',', rule)));
+}
 
 // `rule` with no trailing comma, then an optional trailing comma.
 function commaSep(rule) {
