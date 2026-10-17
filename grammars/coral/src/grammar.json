@@ -3378,10 +3378,6 @@
         },
         {
           "type": "SYMBOL",
-          "name": "assignment_statement"
-        },
-        {
-          "type": "SYMBOL",
           "name": "compile_attr_statement"
         },
         {
@@ -3907,17 +3903,8 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "CHOICE",
-              "members": [
-                {
-                  "type": "SYMBOL",
-                  "name": "string_literal"
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "raw_string"
-                }
-              ]
+              "type": "STRING",
+              "value": "volatile"
             },
             {
               "type": "BLANK"
@@ -3925,16 +3912,84 @@
           ]
         },
         {
-          "type": "STRING",
-          "value": "{"
-        },
-        {
-          "type": "PATTERN",
-          "value": "[^}]*"
-        },
-        {
-          "type": "STRING",
-          "value": "}"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "SYMBOL",
+                          "name": "string_literal"
+                        },
+                        {
+                          "type": "SYMBOL",
+                          "name": "raw_string"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "BLANK"
+                    }
+                  ]
+                },
+                {
+                  "type": "STRING",
+                  "value": "{"
+                },
+                {
+                  "type": "PATTERN",
+                  "value": "[^}]*"
+                },
+                {
+                  "type": "STRING",
+                  "value": "}"
+                }
+              ]
+            },
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": "("
+                },
+                {
+                  "type": "REPEAT",
+                  "content": {
+                    "type": "CHOICE",
+                    "members": [
+                      {
+                        "type": "SYMBOL",
+                        "name": "string_literal"
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "raw_string"
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "identifier"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "type": "STRING",
+                  "value": ")"
+                },
+                {
+                  "type": "STRING",
+                  "value": ";"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -4033,23 +4088,6 @@
               "type": "SYMBOL",
               "name": "_expression"
             }
-          }
-        ]
-      }
-    },
-    "assignment_statement": {
-      "type": "PREC_RIGHT",
-      "value": 0,
-      "content": {
-        "type": "SEQ",
-        "members": [
-          {
-            "type": "SYMBOL",
-            "name": "assignment_expression"
-          },
-          {
-            "type": "STRING",
-            "value": ";"
           }
         ]
       }
@@ -4446,7 +4484,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "assignment_statement"
+          "name": "assignment_expression"
         },
         {
           "type": "SYMBOL",
@@ -6288,20 +6326,24 @@
       "_expression"
     ],
     [
-      "assignment_statement",
+      "local_declaration",
       "_for_init"
     ],
     [
-      "assignment_statement",
+      "_for_init",
       "assignment_expression"
     ],
     [
       "_for_init",
-      "assignment_statement"
+      "_expression"
     ],
     [
-      "local_declaration",
-      "_for_init"
+      "for_statement",
+      "_expression"
+    ],
+    [
+      "for_statement",
+      "assignment_expression"
     ],
     [
       "_for_init",
@@ -6380,14 +6422,6 @@
       "unary_expression"
     ],
     [
-      "assignment_statement",
-      "variable_declaration"
-    ],
-    [
-      "assignment_statement",
-      "binary_expression"
-    ],
-    [
       "builtin_expression",
       "call_expression"
     ],
@@ -6421,10 +6455,6 @@
     [
       "struct_field",
       "_expression"
-    ],
-    [
-      "struct_field",
-      "assignment_statement"
     ],
     [
       "struct_field",

@@ -119,10 +119,11 @@ module.exports = grammar({
     [$.local_declaration, $.constructor_declaration],
     [$.local_declaration, $.const_declaration],
     [$.local_declaration, $._expression],
-    [$.assignment_statement, $._for_init],
-    [$.assignment_statement, $.assignment_expression],
-    [$._for_init, $.assignment_statement],
     [$.local_declaration, $._for_init],
+    [$._for_init, $.assignment_expression],
+    [$._for_init, $._expression],
+    [$.for_statement, $._expression],
+    [$.for_statement, $.assignment_expression],
     [$._for_init, $._expression],
     [$.local_declaration, $.array_type],
     [$.field_declaration, $.variable_declaration],
@@ -142,8 +143,6 @@ module.exports = grammar({
     [$.cast_expression, $.binary_expression],
     [$.postfix_expression, $.binary_expression],
     [$.postfix_expression, $.unary_expression],
-    [$.assignment_statement, $.variable_declaration],
-    [$.assignment_statement, $.binary_expression],
     [$.builtin_expression, $.call_expression],
     [$.statement, $._expression, $.if_expression],
     [$.statement, $._expression, $.switch_expression],
@@ -152,7 +151,6 @@ module.exports = grammar({
     [$.compile_attr_statement, $.statement],
     [$.compile_attr_statement, $.expression_statement],
     [$.struct_field, $._expression],
-    [$.struct_field, $.assignment_statement],
     [$.struct_field, $.initializer_list],
     [$._expression, $.struct_field],
     [$.statement, $._expression],
@@ -756,7 +754,6 @@ module.exports = grammar({
       $.defer_statement,
       $.asm_statement,
       $.comptime_block,
-      $.assignment_statement,
       $.compile_attr_statement,
       $.expression_statement,
       $.block,
@@ -862,12 +859,14 @@ module.exports = grammar({
     defer_statement: $ => seq('defer', $.statement),
 
     // `asm "…" { outputs }` (partially supported by the compiler).
+    // `asm "tmpl" { … }`, `asm { … }`, `asm volatile { … }`, `asm volatile(…);`
     asm_statement: $ => seq(
       'asm',
-      optional(choice($.string_literal, $.raw_string)),
-      '{',
-      /[^}]*/,
-      '}',
+      optional('volatile'),
+      choice(
+        seq(optional(choice($.string_literal, $.raw_string)), '{', /[^}]*/, '}'),
+        seq('(', repeat(choice($.string_literal, $.raw_string, $.identifier)), ')', ';'),
+      ),
     ),
 
     // General compile-time block: selects / emits code.
@@ -882,11 +881,6 @@ module.exports = grammar({
         '|=', '&=', '^=', '~=', '<<=', '>>=',
       )),
       field('right', $._expression),
-    )),
-
-    assignment_statement: $ => prec.right(seq(
-      $.assignment_expression,
-      ';',
     )),
 
     // ══════════════════════════════════════════════════════════════════
@@ -977,7 +971,7 @@ module.exports = grammar({
       $.unary_expression,
       $.binary_expression,
       $.comparison_expression,
-      $.assignment_statement,
+      $.assignment_expression,
       $.block,
       $.if_expression,
       $.switch_expression,
