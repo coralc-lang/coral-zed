@@ -56,6 +56,17 @@ for q in brackets highlights indents outline textobjects; do
 done
 rm -f /tmp/.__coral_probe.crl /tmp/.__coral_qerr
 
+echo '== generate vs code textmate grammar'
+if command -v python3 >/dev/null && [ -d "$ROOT/../coral-vscode" ]; then
+  python3 "$ROOT/gen-tmgrammar.py" | sed 's/^/   /'
+  if [ -f "$ROOT/../coral-vscode/tools/check-tmgrammar.js" ] \
+     && [ -d /usr/lib/code/node_modules/vscode-textmate ]; then
+    ( cd "$ROOT/../coral-vscode" \
+      && node tools/check-tmgrammar.js \
+           "$PROBE" ) | sed 's/^/   /' || echo '   (textmate check failed)'
+  fi
+fi
+
 echo '== install'
 mkdir -p "$DST"
 rsync -a --delete \
