@@ -206,11 +206,14 @@ module.exports = grammar({
     ),
 
     // `@assert(cond)`, `@compileError(...)`, `@isFormatLiteral`,
-    // `@assertOut(...)` — compile-time attributes.
+    // `@assertOut(...)` — compile-time attributes. `@sizeof(T)` /
+    // `@alignof(T)` take a *type*, so those arguments are expressions.
     compile_attr: $ => prec.right(20, seq(
       '@',
       field('name', $.identifier),
-      optional($.arguments),
+      // The argument may be a type (`@sizeof(u8*)`, `@alignof(T)`) or an
+      // expression (`@assert(cond)`, `@isFormatLiteral`).
+      optional(seq('(', commaSep(choice($._expression, $._type)), ')')),
     )),
 
     // ══════════════════════════════════════════════════════════════════
@@ -347,7 +350,11 @@ module.exports = grammar({
     ),
 
     // `[N]` / `[N][M]` declarator suffix: `u8 tmp[72];`
-    _array_declarator: $ => repeat1(seq('[', $._expression, ']')),
+    // An empty `[]` is a slice of unknown length: `static X86Reg t[] = { … };`
+    _array_declarator: $ => repeat1(choice(
+      seq('[', $._expression, ']'),
+      seq('[', ']'),
+    )),
 
     // Constructors: `static new(...)`, `static map(...)`.
     constructor_declaration: $ => seq(
@@ -562,7 +569,7 @@ module.exports = grammar({
     // `{ expr, expr, … }` — brace initialiser for arrays/structs.
     initializer_list: $ => seq(
       '{',
-      commaSepTrail(choice($._expression, $.struct_field)),
+      commaSepTrail(choice($._expression, $.struct_field, $.initializer_list)),
       optional(','),
       '}',
     ),
