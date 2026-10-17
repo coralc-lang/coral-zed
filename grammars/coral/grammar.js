@@ -878,8 +878,13 @@ module.exports = grammar({
       '}',
     ),
 
+    // A case may list several patterns:
+    //   A::B,
+    //   A::C => { … }
+    // and its body may be an unbraced statement, in which case the comma
+    // separator is what ends it.
     case_clause: $ => seq(
-      $.pattern,
+      commaSep1($.pattern),
       '=>',
       $.statement,
       optional(','),
