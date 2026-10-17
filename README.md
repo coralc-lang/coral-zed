@@ -253,26 +253,62 @@ rejected in `#[[…]]`.
 
 ## Editor ↔ compiler communication
 
-The grammar and queries are the editor side of a larger protocol. When a Coral
-language server exists it will speak JSON, and this extension is where the
-editor-side wiring belongs.
+`coralc` does not speak LSP yet. [`PROTOCOL.md`](./PROTOCOL.md) is the contract:
+JSON-RPC 2.0 over stdio, one object per line, with
+`publishDiagnostics`, `documentSymbol`, `hover`, `definition`, `references`,
+`completion`, and two Coral-specific methods (`coral/attributes`,
+`coral/typeInfo`).
 
-The intended shape, so the hook has a design to grow into:
+### The hook
 
-```jsonc
-// request
-{ "jsonrpc": "2.0", "id": 1, "method": "coral/diagnostics", "params": { "uri": "file:///x.crl" } }
-// response
-{ "jsonrpc": "2.0", "id": 1, "result": { "diagnostics": [
-  { "range": { "start": { "line": 3, "character": 4 }, "end": { "line": 3, "character": 12 } },
-    "severity": 1, "code": "ParseExpectedDecl", "message": "expected declaration" }
-] } }
+`zed/coral-lsp.sh` is the launcher. It resolves the compiler and execs it, so
+Zed never has to know where coralc lives:
+
+```sh
+zed/install.sh          # -> ~/.local/bin/coral-lsp
 ```
 
-Nothing in this extension sends that request. Hook it up by adding a
-`[language_servers.coral]` section to `extension.toml` and implementing
-`language_server_command` in a Rust `src/lib.rs` for the extension, which also
-means adding a `[lib]` section and shipping a `.wasm` extension binary.
+Then point Zed at it in `~/.config/zed/settings.json`:
+
+```json
+"Coral": { "language_servers": ["coral", "..."] },
+"language_servers": {
+  "coral": {
+    "source": "custom",
+    "command": { "path": "coral-lsp", "args": [] }
+  }
+}
+```
+
+Until `coralc serve` exists the launcher exits 126 with a reason on stderr, and
+Zed simply runs no Coral server. Highlighting is unaffected because it needs no
+compiler.
+
+This is deliberately *not* a `[language_servers.coral]` entry in
+`extension.toml`: Zed implements `language_server_command` in a compiled
+`extension.wasm`, which would need the wasi-sdk and therefore a download. The
+settings route keeps the whole extension build-free.
+
+### Where the compiler is looked for
+
+First hit wins, identically in both editors:
+
+1. explicit setting — `language_servers.coral.path` / `coral.languageServer.path`
+2. `$CORALC`
+3. `$CORAL_HOME/coralc`
+4. `coralc` on `PATH`
+5. platform roots — `~/.coral/bin`, `~/.local/bin`, `~/bin`,
+   `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`; on Windows
+   `%LOCALAPPDATA%\coral`, `%LOCALAPPDATA%\Programs\coral`
+
+`CORAL_HOME` matches the `env = { CORAL_HOME = … }` block in the build
+manifests, and `/usr/local/bin` matches `artifact "coralc" { install = … }`.
+
+The editor never passes library paths or `CORAL_HOME` to the compiler. On Linux
+the compiler's libraries live under `~/.coral` (`lib`, `store`, `projects`, and
+the per-project `cache`, `modules.map`, `artifacts`, `graph.dot`,
+`metrics.json`), and that stays the compiler's business — hard-coding it in an
+editor would break the moment the layout changes.
 
 ---
 

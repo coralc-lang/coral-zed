@@ -59,11 +59,38 @@ rm -f /tmp/.__coral_probe.crl /tmp/.__coral_qerr
 echo '== generate vs code textmate grammar'
 if command -v python3 >/dev/null && [ -d "$ROOT/../coral-vscode" ]; then
   python3 "$ROOT/gen-tmgrammar.py" | sed 's/^/   /'
-  if [ -f "$ROOT/../coral-vscode/tools/check-tmgrammar.js" ] \
+  VS="$ROOT/../coral-vscode"
+  if [ -f "$VS/tools/check-tmgrammar.js" ] \
      && [ -d /usr/lib/code/node_modules/vscode-textmate ]; then
-    ( cd "$ROOT/../coral-vscode" \
-      && node tools/check-tmgrammar.js \
-           "$PROBE" ) | sed 's/^/   /' || echo '   (textmate check failed)'
+    ( cd "$VS" && node tools/check-tmgrammar.js "$PROBE" ) \
+      | sed 's/^/   /' || echo '   (textmate check failed)'
+  fi
+  # language-server client: transport and compiler-resolution tests
+  for t in test-client test-find-compiler; do
+    if [ -f "$VS/tools/$t.js" ]; then
+      printf '   %-20s' "$t"
+      if ( cd "$VS" && node "tools/$t.js" >/dev/null 2>&1 ); then
+        echo OK
+      else
+        echo FAIL
+        ( cd "$VS" && node "tools/$t.js" 2>&1 | tail -5 | sed 's/^/      /' )
+        exit 1
+      fi
+    fi
+  done
+fi
+
+echo '== language server launcher'
+LAUNCHER="$ROOT/zed/coral-lsp.sh"
+if [ -f "$LAUNCHER" ]; then
+  bash -n "$LAUNCHER" || exit 1
+  printf '   %-20s' 'coral-lsp.sh'
+  # With no compiler it must exit 126 and say why, not crash.
+  if env -u CORALC -u CORAL_HOME PATH=/usr/bin:/bin "$LAUNCHER" >/dev/null 2>&1; then
+    echo 'unexpected success'
+    exit 1
+  else
+    echo 'OK (exits 126 without a compiler)'
   fi
 fi
 
@@ -72,6 +99,7 @@ mkdir -p "$DST"
 rsync -a --delete \
   --exclude '.git/' --exclude 'test/' --exclude 'install.sh' --exclude 'build.sh' \
   --exclude '*.py' --exclude 'grammars/coral/' \
+  --exclude 'test/' \
   "$ROOT/" "$DST/"
 mkdir -p "$DST/grammars"
 cp "$ROOT/grammars/coral.wasm" "$DST/grammars/coral.wasm"

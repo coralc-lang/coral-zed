@@ -1,3 +1,4 @@
 *.o
 *.so
 node_modules/
+*.vsix
