@@ -178,6 +178,16 @@
 (comparison_expression) @operator
 (conditional_expression) @operator
 
+
+; ── Inline assembly ──
+; The body is GCC extended-asm: instruction templates, then `:`-separated
+; output / input / clobber sections.
+(asm_statement "asm" @keyword.other)
+(asm_statement "volatile" @keyword.modifier)
+(asm_template (string_literal) @string.special.symbol)
+(asm_operand (asm_constraint) @string.special)
+(asm_section ":" @punctuation.special)
+
 ; ── Operators ──
 [
   "="

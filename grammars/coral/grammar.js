@@ -910,13 +910,47 @@ module.exports = grammar({
 
     // `asm "…" { outputs }` (partially supported by the compiler).
     // `asm "tmpl" { … }`, `asm { … }`, `asm volatile { … }`, `asm volatile(…);`
+    // `asm "tmpl" { outputs }`, `asm { … }`, `asm volatile { … }`,
+    // `asm volatile(…);`
+    //
+    // The body is GCC extended-asm: template strings, then `:`-separated
+    // operand / clobber sections. It used to be one opaque `/[^}]*/` token,
+    // which highlighted as a blank span.
     asm_statement: $ => seq(
       'asm',
       optional('volatile'),
       choice(
-        seq(optional(choice($.string_literal, $.raw_string)), '{', /[^}]*/, '}'),
-        seq('(', repeat(choice($.string_literal, $.raw_string, $.identifier)), ')', ';'),
+        seq(
+          '{',
+          optional($.asm_template),
+          repeat($.asm_section),
+          '}',
+        ),
+        seq(
+          '(', repeat($.string_literal), ')', ';',
+        ),
       ),
+    ),
+
+    // `"movq %%rdi\n\t"` — the instruction template. Adjacent string
+    // literals concatenate in extended asm; they are kept as separate
+    // children rather than comma-separated because a comma would be
+    // ambiguous with the section list that follows.
+    asm_template: $ => repeat1(choice($.string_literal, $.raw_string)),
+
+    // One `:`-introduced section: outputs, inputs, or clobbers.
+    //   : "=a"(ret)
+    //   : "0"(9u), "D"((usize)addr)
+    //   : "rcx", "r8", "memory"
+    asm_section: $ => seq(
+      ':',
+      commaSep(choice($._expression, $.asm_operand)),
+    ),
+
+    // A constraint pair: `"=a"(ret)` or `"memory"`.
+    asm_operand: $ => seq(
+      alias(token(/"[^"]*"/), $.asm_constraint),
+      optional(seq('(', $._expression, ')')),
     ),
 
     // General compile-time block: selects / emits code.
