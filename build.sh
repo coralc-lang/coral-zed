@@ -78,6 +78,19 @@ if command -v python3 >/dev/null && [ -d "$ROOT/../coral-vscode" ]; then
       fi
     fi
   done
+  # TextMate cannot resolve structure, so guard against silently collapsing
+  # into one colour: require most tokens to receive a real scope.
+  if [ -f "$VS/tools/scope-coverage.js" ]; then
+    printf '   %-20s' 'scope-coverage'
+    cov=$( cd "$VS" && node tools/scope-coverage.js "$PROBE" 2>/dev/null \
+           | awk '/^scoped/ {gsub(/[%()]/,"",$3); print $3}' )
+    if awk -v c="$cov" 'BEGIN { exit !(c+0 >= 95) }' 2>/dev/null; then
+      echo "OK (${cov}% scoped)"
+    else
+      echo "FAIL (${cov:-?}% scoped, need >= 95)"
+      exit 1
+    fi
+  fi
 fi
 
 echo '== language server launcher'

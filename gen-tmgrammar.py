@@ -225,6 +225,21 @@ def word_pattern(words):
 
 
 def build(x):
+    """Assemble the TextMate grammar.
+
+    TextMate cannot resolve structure the way tree-sitter does, so the goal is
+    approximation with enough context to stay useful:
+
+      * line-anchored patterns catch declarations (`Type name(`, `Type name;`),
+        which is what makes function names and fields coloured;
+      * a lookahead for `(` catches calls and function types;
+      * `\\.name` / `->name` catch field and method access;
+      * `mod::Name` catches qualified paths;
+      * everything else falls through to a bare identifier scope.
+
+    Without these, every identifier shares one colour and the result reads as
+    noise.
+    """
     types = sorted(x.types())
     # Order matters: a token belongs to the first bucket that claims it.
     imports = sorted(x.import_keywords())
@@ -235,15 +250,156 @@ def build(x):
     values = sorted(x.values())
     ops = sorted(x.operators())
 
-    keywords = {
-        'keyword.control.import.coral': word_pattern(imports),
-        'storage.modifier.coral': word_pattern(mods),
-        'keyword.declaration.type.coral': word_pattern(decl),
-        'keyword.control.coral': word_pattern(control),
-        'support.function.builtin.coral': word_pattern(builtins),
-        'constant.language.coral': word_pattern(values),
-        'storage.type.coral': word_pattern(types),
-    }
+    # -- line-anchored declarations ------------------------------------
+    type_w = r'(?:%s)' % alt(types)
+    decl_w = r'(?:%s)' % alt(decl)
+    ident = r'[A-Za-z_][A-Za-z0-9_]*'
+
+    declarations = [
+        # fn/method: `<Type> name<gen>(params)` possibly `static`/`pub`
+        {'match': r'^(\s*)((?:pub\s+|static\s+|volatile\s+)*)'
+                 r'(%s(?:\s*[*\[][^\n]*?\s*)?)'
+                 r'\s+(%s)\s*(?:<[^>]*>)?(\s*\()' % (type_w, ident),
+         'captures': {
+             '2': {'name': 'storage.modifier.coral'},
+             '3': {'name': 'storage.type.coral'},
+             '4': {'name': 'entity.name.function.coral'},
+             '5': {'name': 'punctuation.definition.parameters.coral'}}},
+        # fn with no return type: `name<comptime T>(params)`
+        {'match': r'^(\s*)((?:pub\s+|static\s+)*)(%s)\s*<[^>]*>(\s*\()' % ident,
+         'captures': {
+             '2': {'name': 'storage.modifier.coral'},
+             '3': {'name': 'entity.name.function.coral'},
+             '4': {'name': 'punctuation.definition.parameters.coral'}}},
+        # constructor: `static new(`
+        {'match': r'^\s*static\s+(%s)(\s*\()' % ident,
+         'captures': {
+             '1': {'name': 'entity.name.function.coral'},
+             '2': {'name': 'punctuation.definition.parameters.coral'}}},
+        # field / local: `<Type> name;` or `<Type> name = expr;`
+        # The leading modifiers are deliberately non-capturing so `pub` and
+        # `volatile` stay available to #keywords.
+        {'match': r'^\s*(?:pub\s+|volatile\s+)*'
+                 r'(%s(?:\s*[*\[][^\n=;]*?\s*)?)'
+                 r'\s+(%s)\s*(?=[\[;=])' % (type_w, ident),
+         'captures': {
+             '1': {'name': 'storage.type.coral'},
+             '2': {'name': 'variable.other.member.coral'}}},
+        # `u8 tmp[72];` — declarator suffix on a field/local
+        {'match': r'^\s*(?:(?:pub|volatile)\s+)*(%s)\s+(%s)\s*(\[)'
+                 % (type_w, ident),
+         'captures': {
+             '1': {'name': 'storage.type.coral'},
+             '2': {'name': 'variable.other.member.coral'},
+             '3': {'name': 'punctuation.definition.subscript.coral'}}},
+        # extend / trait method: `pub extend<T> Name<T> {`  and `T method(...)`
+        {'match': r'^\s*(extend)(?:\s*<[^>]*>)?\s+(%s)' % ident,
+         'captures': {
+             '1': {'name': 'keyword.declaration.type.coral'},
+             '2': {'name': 'entity.name.type.coral'}}},
+        # struct/variant/... names are handled by #declarations-kw below
+    ]
+
+    kw_declarations = [
+        # `struct Name<T> {` / `variant Name` / `enum Name` / `union Name`
+        {'match': r'\b(%s)(?:\s*<[^>]*>)?\s+(%s)' % (decl_w, ident),
+         'captures': {
+             '1': {'name': 'keyword.declaration.type.coral'},
+             '2': {'name': 'entity.name.type.coral'}}},
+        # `mod name = import path`
+        {'match': r'\b(mod)\s+(%s)\s*=' % ident,
+         'captures': {
+             '1': {'name': 'keyword.control.import.coral'},
+             '2': {'name': 'entity.name.namespace.coral'}}},
+        # `mod path::to::thing`  /  `mod::thing`
+        {'match': r'\b(mod)((?:::%s)+)' % ident,
+         'captures': {'1': {'name': 'keyword.control.import.coral'}}},
+        # `import path::thing { Sym }`
+        {'match': r'\b(import)\s+((?:::%s)*%s)' % (ident, ident),
+         'captures': {
+             '1': {'name': 'keyword.control.import.coral'},
+             '2': {'name': 'entity.name.namespace.coral'}}},
+    ]
+
+    # -- expressions and member access ---------------------------------
+    expressions = [
+        # method call: `.name(`
+        {'match': r'(\.)(%s)(\s*\()' % ident,
+         'captures': {
+             '1': {'name': 'punctuation.accessor.coral'},
+             '2': {'name': 'entity.name.function.coral'},
+             '3': {'name': 'punctuation.definition.parameters.coral'}}},
+        # pointer deref field: `->name`
+        {'match': r'(->)(%s)' % ident,
+         'captures': {
+             '1': {'name': 'punctuation.accessor.coral'},
+             '2': {'name': 'variable.other.member.coral'}}},
+        # field access: `.name`
+        {'match': r'(\.)(%s)' % ident,
+         'captures': {
+             '1': {'name': 'punctuation.accessor.coral'},
+             '2': {'name': 'variable.other.member.coral'}}},
+        # call: `name(`
+        {'match': r'(?<![.\w])(%s)(\s*\()' % ident,
+         'captures': {
+             '1': {'name': 'entity.name.function.call.coral'},
+             '2': {'name': 'punctuation.definition.parameters.coral'}}},
+        # qualified path head and tail: `mod::Name`
+        {'match': r'\b(%s)(::)' % ident,
+         'captures': {'1': {'name': 'entity.name.namespace.coral'},
+                      '2': {'name': 'punctuation.accessor.coral'}}},
+        {'match': r'(::)(%s)' % ident,
+         'captures': {'1': {'name': 'punctuation.accessor.coral'},
+                      '2': {'name': 'entity.name.coral'}}},
+        # ALL_CAPS is the convention for constants (`INT64_MIN`, `MAX`).
+        # Checked before CapWords so it wins.
+        {'match': r'\b([A-Z][A-Z0-9_]{1,})\b',
+         'name': 'constant.other.coral'},
+        # CapWords are types and variant/enum members in Coral.
+        {'match': r'\b([A-Z][A-Za-z0-9_]*)\b',
+         'name': 'entity.name.type.coral'},
+        # bare identifier
+        {'match': r'\b(%s)\b' % ident,
+         'name': 'variable.other.coral'},
+    ]
+
+    keywords = [
+        {'name': 'keyword.control.import.coral', 'match': word_pattern(imports)},
+        {'name': 'storage.modifier.coral', 'match': word_pattern(mods)},
+        {'name': 'keyword.declaration.type.coral', 'match': word_pattern(decl)},
+        {'name': 'keyword.control.conditional.coral',
+         'match': word_pattern([k for k in control if k in
+                               ('if', 'else', 'switch')])},
+        {'name': 'keyword.control.loop.coral',
+         'match': word_pattern([k for k in control if k in
+                               ('for', 'while', 'loop', 'break', 'continue')])},
+        {'name': 'keyword.control.flow.coral',
+         'match': word_pattern([k for k in control if k in
+                               ('return', 'defer', 'asm', 'comptime')])},
+        {'name': 'support.function.builtin.coral', 'match': word_pattern(builtins)},
+        {'name': 'variable.language.self.coral', 'match': r'\bself\b'},
+        {'name': 'constant.language.coral',
+         'match': word_pattern([v for v in values if v != 'self'])},
+        {'name': 'storage.type.coral', 'match': word_pattern(types)},
+    ]
+
+    # -- operators, split so themes can differentiate -------------------
+    assign_ops = sorted({o for o in ops if o.endswith('=') and o != '=='
+                         and o not in ('!=', '<=', '>=')})
+    logic_ops = sorted({o for o in ops if o in ('&&', '||', '!')})
+    cmp_ops = sorted({o for o in ops if o in
+                      ('==', '!=', '<', '>', '<=', '>=')})
+    shift_ops = sorted({o for o in ops if o in ('<<', '>>')})
+    rest_ops = sorted(set(ops) - set(assign_ops) - set(logic_ops)
+                      - set(cmp_ops) - set(shift_ops))
+
+    operators = [
+        {'name': 'keyword.operator.assignment.coral', 'match': alt(assign_ops)},
+        {'name': 'keyword.operator.logical.coral', 'match': alt(logic_ops)},
+        {'name': 'keyword.operator.comparison.coral', 'match': alt(cmp_ops)},
+        {'name': 'keyword.operator.bitwise.coral', 'match': alt(shift_ops)},
+        {'name': 'keyword.operator.arithmetic.coral', 'match': alt(rest_ops)},
+    ]
 
     return {
         'scopeName': 'source.coral',
@@ -258,6 +414,8 @@ def build(x):
             {'include': '#chars'},
             {'include': '#numbers'},
             {'include': '#declarations'},
+            {'include': '#declarations-kw'},
+            {'include': '#expressions'},
             {'include': '#keywords'},
             {'include': '#operators'},
             {'include': '#punctuation'},
@@ -283,7 +441,7 @@ def build(x):
             }]},
             'compile-attrs': {'patterns': [{
                 'name': 'meta.attribute.compile.coral',
-                'match': r'(@)([A-Za-z_][A-Za-z0-9_]*)',
+                'match': r'(@)(%s)' % ident,
                 'captures': {
                     '1': {'name': 'punctuation.definition.annotation.coral'},
                     '2': {'name': 'support.function.compile-attribute.coral'},
@@ -314,56 +472,43 @@ def build(x):
             }]},
             'numbers': {'patterns': [
                 {'name': 'constant.numeric.integer.hex.coral',
-                 'match': r'\b0[xX][0-9a-fA-F][0-9a-fA-F_]*([uU][lL]{0,2}|[lL]{1,2}[uU]?)?\b'},
+                 'match': r'\b0[xX][0-9a-fA-F][0-9a-fA-F_]*'
+                          r'([uU][lL]{0,2}|[lL]{1,2}[uU]?)?\b'},
                 {'name': 'constant.numeric.integer.binary.coral',
-                 'match': r'\b0[bB][01][01_]*([uU][lL]{0,2}|[lL]{1,2}[uU]?)?\b'},
+                 'match': r'\b0[bB][01][01_]*'
+                          r'([uU][lL]{0,2}|[lL]{1,2}[uU]?)?\b'},
                 {'name': 'constant.numeric.integer.octal.coral',
-                 'match': r'\b0[oO][0-7][0-7_]*([uU][lL]{0,2}|[lL]{1,2}[uU]?)?\b'},
+                 'match': r'\b0[oO][0-7][0-7_]*'
+                          r'([uU][lL]{0,2}|[lL]{1,2}[uU]?)?\b'},
                 {'name': 'constant.numeric.float.coral',
-                 'match': r'\b[0-9][0-9_]*(\.[0-9_]*([eE][+-]?[0-9][0-9_]*)?|[eE][+-]?[0-9][0-9_]*)[fF]?\b'},
+                 'match': r'\b[0-9][0-9_]*'
+                          r'(\.[0-9_]*([eE][+-]?[0-9][0-9_]*)?'
+                          r'|[eE][+-]?[0-9][0-9_]*)[fF]?\b'},
                 {'name': 'constant.numeric.integer.coral',
-                 'match': r'\b[0-9][0-9_]*([uU][lL]{0,2}|[lL]{1,2}[uU]?)?\b'},
+                 'match': r'\b[0-9][0-9_]*'
+                          r'([uU][lL]{0,2}|[lL]{1,2}[uU]?)?\b'},
             ]},
-            'declarations': {'patterns': [
-                {'match': r'^\s*(pub\s+)?(%s)\s+([A-Za-z_][A-Za-z0-9_]*)' % alt(decl),
-                 'captures': {
-                     '1': {'name': 'storage.modifier.coral'},
-                     '2': {'name': 'keyword.declaration.type.coral'},
-                     '3': {'name': 'entity.name.type.coral'}}},
-                {'match': r'^\s*(mod)\s+([A-Za-z_][A-Za-z0-9_]*)',
-                 'captures': {
-                     '1': {'name': 'keyword.control.import.coral'},
-                     '2': {'name': 'entity.name.namespace.coral'}}},
-                {'match': r'^\s*(const)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(=)',
-                 'captures': {
-                     '1': {'name': 'storage.modifier.coral'},
-                     '2': {'name': 'variable.other.constant.coral'},
-                     '3': {'name': 'keyword.operator.coral'}}},
-                {'match': r'^\s*(extern)\s*(\(?\s*(C|c)\s*\)?)?\s*([A-Za-z_][A-Za-z0-9_]*)',
-                 'captures': {
-                     '1': {'name': 'storage.modifier.coral'}}},
-                {'match': r'(?<![A-Za-z0-9_])(%s)\s+([A-Za-z_][A-Za-z0-9_]*)' % alt(decl),
-                 'captures': {
-                     '1': {'name': 'keyword.declaration.type.coral'},
-                     '2': {'name': 'entity.name.type.coral'}}},
-            ]},
-            'keywords': {'patterns': [
-                {'name': name, 'match': pat}
-                for name, pat in keywords.items() if pat != r'\b(?:)\b'
-            ]},
-            'operators': {'patterns': [
-                {'name': 'keyword.operator.coral', 'match': alt(ops)},
-            ]},
+            'declarations': {'patterns': declarations},
+            'declarations-kw': {'patterns': kw_declarations},
+            'expressions': {'patterns': expressions},
+            'keywords': {'patterns': [k for k in keywords
+                                     if k['match'] != r'\b(?:)\b']},
+            'operators': {'patterns': [o for o in operators
+                                       if o['match']]},
             'punctuation': {'patterns': [
                 {'name': 'punctuation.definition.block.coral', 'match': '[{}]'},
-                {'name': 'punctuation.definition.parameters.coral', 'match': '[()]'},
-                {'name': 'punctuation.definition.subscript.coral', 'match': r'[\[\]]'},
+                {'name': 'punctuation.definition.parameters.coral',
+                 'match': '[()]'},
+                {'name': 'punctuation.definition.subscript.coral',
+                 'match': r'[\[\]]'},
                 {'name': 'punctuation.separator.coral', 'match': r'[,;.]'},
                 {'name': 'punctuation.definition.colon.coral', 'match': ':'},
-                {'name': 'punctuation.definition.annotation.coral', 'match': '[@#]'},
+                {'name': 'punctuation.definition.annotation.coral',
+                 'match': '[@#]'},
             ]},
         },
     }
+
 
 
 def main():
