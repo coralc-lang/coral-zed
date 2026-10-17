@@ -672,8 +672,17 @@
         {
           "type": "REPEAT",
           "content": {
-            "type": "SYMBOL",
-            "name": "struct_member"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "attribute_declaration"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "struct_member"
+              }
+            ]
           }
         },
         {
@@ -685,10 +694,6 @@
     "struct_member": {
       "type": "CHOICE",
       "members": [
-        {
-          "type": "SYMBOL",
-          "name": "attribute_declaration"
-        },
         {
           "type": "SYMBOL",
           "name": "field_declaration"
@@ -1446,8 +1451,17 @@
         {
           "type": "REPEAT",
           "content": {
-            "type": "SYMBOL",
-            "name": "trait_method"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "attribute_declaration"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "trait_method"
+              }
+            ]
           }
         },
         {
@@ -3389,8 +3403,17 @@
         {
           "type": "REPEAT",
           "content": {
-            "type": "SYMBOL",
-            "name": "statement"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "attribute_declaration"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "statement"
+              }
+            ]
           }
         },
         {
@@ -4183,6 +4206,10 @@
       "members": [
         {
           "type": "SYMBOL",
+          "name": "type_pattern"
+        },
+        {
+          "type": "SYMBOL",
           "name": "wildcard_pattern"
         },
         {
@@ -4214,6 +4241,14 @@
           "name": "identifier_pattern"
         }
       ]
+    },
+    "type_pattern": {
+      "type": "PREC",
+      "value": 2,
+      "content": {
+        "type": "SYMBOL",
+        "name": "_type"
+      }
     },
     "wildcard_pattern": {
       "type": "STRING",
@@ -6569,6 +6604,47 @@
     [
       "identifier_pattern",
       "variant_pattern"
+    ],
+    [
+      "identifier_pattern",
+      "named_type",
+      "variant_pattern"
+    ],
+    [
+      "type_pattern",
+      "identifier_pattern"
+    ],
+    [
+      "type_pattern",
+      "variant_pattern"
+    ],
+    [
+      "type_pattern",
+      "named_type"
+    ],
+    [
+      "type_pattern",
+      "pattern"
+    ],
+    [
+      "path_pattern",
+      "qualified_type"
+    ],
+    [
+      "type_pattern",
+      "_expression"
+    ],
+    [
+      "type_pattern",
+      "identifier_pattern"
+    ],
+    [
+      "type_pattern",
+      "pattern"
+    ],
+    [
+      "path_pattern",
+      "qualified_type"
     ],
     [
       "identifier_pattern",

@@ -158,6 +158,16 @@ module.exports = grammar({
     [$.statement, $.switch_expression],
     [$._for_binding, $._expression],
     [$.identifier_pattern, $.variant_pattern],
+    [$.identifier_pattern, $.named_type, $.variant_pattern],
+    [$.type_pattern, $.identifier_pattern],
+    [$.type_pattern, $.variant_pattern],
+    [$.type_pattern, $.named_type],
+    [$.type_pattern, $.pattern],
+    [$.path_pattern, $.qualified_type],
+    [$.type_pattern, $._expression],
+    [$.type_pattern, $.identifier_pattern],
+    [$.type_pattern, $.pattern],
+    [$.path_pattern, $.qualified_type],
     [$.identifier_pattern, $.struct_literal],
     [$.identifier_pattern, $._expression],
     [$.struct_member, $._expression],
@@ -290,10 +300,13 @@ module.exports = grammar({
       $.struct_body,
     ),
 
-    struct_body: $ => seq('{', repeat($.struct_member), '}'),
+    struct_body: $ => seq(
+      '{',
+      repeat(choice($.attribute_declaration, $.struct_member)),
+      '}',
+    ),
 
     struct_member: $ => choice(
-      $.attribute_declaration,
       $.field_declaration,
       $.method_declaration,
       $.constructor_declaration,
@@ -415,7 +428,7 @@ module.exports = grammar({
       field('name', $.identifier),
       optional($.generic_params),
       '{',
-      repeat($.trait_method),
+      repeat(choice($.attribute_declaration, $.trait_method)),
       '}',
     ),
 
@@ -743,7 +756,10 @@ module.exports = grammar({
     // 6. Statements
     // ══════════════════════════════════════════════════════════════════
 
-    block: $ => seq('{', repeat($.statement), '}'),
+    // Attributes are hoisted to the list level, mirroring `declaration`:
+    // `#[[fallthrough]] switch (…)`, `#[[inline]] void g() {}`. Putting them
+    // in a per-statement wrapper makes two adjacent attributes ambiguous.
+    block: $ => seq('{', repeat(choice($.attribute_declaration, $.statement)), '}'),
 
     statement: $ => choice(
       $.local_declaration,
@@ -895,6 +911,7 @@ module.exports = grammar({
     // ══════════════════════════════════════════════════════════════════
 
     pattern: $ => choice(
+      $.type_pattern,
       $.wildcard_pattern,
       $.literal_pattern,
       $.variant_pattern,
@@ -904,6 +921,9 @@ module.exports = grammar({
       $.else_pattern,
       $.identifier_pattern,
     ),
+
+    // `cchar*`, `u8`, `T` — a type used as a type-switch label.
+    type_pattern: $ => prec(2, $._type),
 
     wildcard_pattern: $ => '_',
 
