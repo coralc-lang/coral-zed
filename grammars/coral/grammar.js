@@ -336,6 +336,8 @@ module.exports = grammar({
     ),
 
     _declarator_head: $ => seq(
+      // `pub u8 const tab = …` puts the const marker after the type.
+      optional(field('const', 'const')),
       field('name', $.identifier),
       optional($._array_declarator),
     ),
@@ -680,12 +682,22 @@ module.exports = grammar({
     )),
 
     // `(T)` / `(T, U)` tuple
-    tuple_type: $ => prec.right(seq(
-      '(',
-      commaSepTrail($._type),
-      optional(','),
-      ')',
-    )),
+    tuple_type: $ => choice(
+      prec.right(seq(
+        '(',
+        commaSepTrail($._type),
+        optional(','),
+        ')',
+      )),
+      // `struct(u32, u32)` — the named tuple spelling
+      prec.right(seq(
+        'struct',
+        '(',
+        commaSepTrail($._type),
+        optional(','),
+        ')',
+      )),
+    ),
 
     named_type: $ => choice(
       $.identifier,
@@ -1090,10 +1102,11 @@ module.exports = grammar({
       $.arguments,
     )),
 
+    // `.name` or, for tuples, `.0` / `.1`
     field_expression: $ => prec(22, seq(
       field('object', $._expression),
       '.',
-      field('field', $.identifier),
+      field('field', choice($.identifier, $.number_literal)),
     )),
 
     deref_field_expression: $ => prec(22, seq(

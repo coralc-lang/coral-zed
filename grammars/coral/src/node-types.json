@@ -2545,6 +2545,16 @@
     "type": "declarator",
     "named": true,
     "fields": {
+      "const": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "const",
+            "named": false
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,
@@ -3633,6 +3643,10 @@
           {
             "type": "identifier",
             "named": true
+          },
+          {
+            "type": "number_literal",
+            "named": true
           }
         ]
       },
@@ -4267,6 +4281,16 @@
     "type": "function_declaration",
     "named": true,
     "fields": {
+      "const": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "const",
+            "named": false
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,
@@ -5628,6 +5652,16 @@
     "type": "method_declaration",
     "named": true,
     "fields": {
+      "const": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "const",
+            "named": false
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,
@@ -8180,6 +8214,16 @@
     "type": "variable_declaration",
     "named": true,
     "fields": {
+      "const": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "const",
+            "named": false
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,
