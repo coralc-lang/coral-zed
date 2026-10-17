@@ -112,7 +112,7 @@ mkdir -p "$DST"
 rsync -a --delete \
   --exclude '.git/' --exclude 'test/' --exclude 'install.sh' --exclude 'build.sh' \
   --exclude '*.py' --exclude 'grammars/coral/' \
-  --exclude 'test/' \
+  --exclude 'test/' --exclude 'coverage.py' \
   "$ROOT/" "$DST/"
 mkdir -p "$DST/grammars"
 cp "$ROOT/grammars/coral.wasm" "$DST/grammars/coral.wasm"

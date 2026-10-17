@@ -312,6 +312,11 @@ editor would break the moment the layout changes.
 
 ---
 
+## Language server
+
+See [LANGUAGE-SERVER.md](./LANGUAGE-SERVER.md) for status, design, and what
+the compiler must implement.
+
 ## Known gaps
 
 The grammar is not complete. The corpus in `test/` is the regression suite;
