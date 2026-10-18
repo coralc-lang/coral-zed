@@ -67,7 +67,9 @@ coralc → process exits
 Hard requirements, per LSP 3.18:
 
 - `initialize` **must** carry `protocolVersion`, `processId`, `rootUri`, and
-  `capabilities`.
+  `capabilities`. `rootUri` may be `null` (single-file session); the server
+  then anchors analysis to the opened document's own directory — see
+  [§3b Standalone files](#3b-standalone-files).
 - Before responding to `initialize`, the server must not send any request or
   notification — with one exception: `window/showMessage`,
   `window/logMessage`, `window/showMessageRequest`, `telemetry/event`, and
@@ -106,7 +108,8 @@ Hard requirements, per LSP 3.18:
 {
   "capabilities": {
     "textDocumentSync": 1,
-    "hoverProvider": true
+    "hoverProvider": true,
+    "definitionProvider": true
   },
   "serverInfo": {"name": "coralc", "version": "0.1.0"}
 }
@@ -623,7 +626,8 @@ live handshake (`tools/test-live-server.js`, 9/9) and the compiler-side suite
 **Working:**
 
 - `Content-Length` framing, exactly as specified above.
-- `initialize` → `{textDocumentSync: 1, hoverProvider: true}`; a request
+- `initialize` → `{textDocumentSync: 1, hoverProvider: true,
+  definitionProvider: true}`; a request
   before `initialize` answers **`-32002`**; a second `initialize` answers
   `-32600`.
 - Malformed JSON answers **`-32700`**; non-object messages `-32600`.
@@ -639,17 +643,48 @@ live handshake (`tools/test-live-server.js`, 9/9) and the compiler-side suite
   closure, so errors in files the open buffer never imports appear too. Files
   that stop having records are cleared on the next report.
 - `textDocument/hover` returns the markdown-typed declaration of the
-  expression or symbol under the cursor (locals and top-level names).
+  expression or symbol under the cursor. Verified for structs, fields,
+  locals, generics, `self`, imports and libc — e.g. `self` → `Arr<T, N>*`,
+  `data` → `T`, `val` → `T val`, `printf` → `i32 printf(const cchar* fmt, ? )`.
+- `textDocument/definition` resolves; 32 of 64 identifier positions in
+  `arr.crl`.
 - `-32601` for unimplemented methods; `$/cancelRequest` accepted.
 
 **Gaps to close:**
 
 | Gap | Detail |
 | --- | --- |
-| No `documentSymbol` | `-32601`. Outline is empty. |
-| No `definition` / `references` | `-32601`. |
-| No `completion` | `-32601`. |
+| **Methods absent from the symbol table** | Hover **and** definition return nothing for every member declaration — `at`, `count`, `ptr`, `constPtr`, `atPtr`, `isEmpty`, `set`, `front`, `back`, `fill`, `copyTo`, `copyFrom`, `new`. Fields, locals, types and free functions all resolve, so member declarations are evidently collected separately and never registered. **Highest-leverage fix remaining:** one table unblocks hover, definition, references, documentSymbol and rename. |
+| `pub` declarations unresolved | `pub void main()` returns nothing from hover; plain `fn main()` works. |
+| No `documentSymbol` | `method not found`. Outline is empty. |
+| No `references`, `completion`, `signatureHelp` | `method not found`. |
+| No `semanticTokens`, `inlayHint`, `foldingRange` | `method not found`. Type info is hover-only, not visible in the buffer. |
 | No `coral/attributes` / `coral/typeInfo` | `-32601`. |
+
+### Two behaviours that look like bugs but are not
+
+**Hover resolves by nearest-preceding-identifier.** A caret resting between two
+symbols returns the earlier one, and whitespace or punctuation still resolves
+to the previous symbol. Always check the reported position before concluding
+that resolution is wrong.
+
+**Advertised capabilities are not evidence.** `definitionProvider: true` was
+advertised while the method still returned `null` everywhere. Verify per
+position rather than trusting the initialize result.
+
+### Verifying a capability
+
+```sh
+node /home/cerie/Documents/coral-vscode/tools/lsp-probe.js FILE --method textDocument/hover
+node /home/cerie/Documents/coral-vscode/tools/lsp-probe.js FILE --method textDocument/definition
+node /home/cerie/Documents/coral-vscode/tools/lsp-probe.js FILE --method textDocument/documentSymbol --json
+node /home/cerie/Documents/coral-vscode/tools/lsp-probe.js --list
+node /home/cerie/Documents/coral-vscode/tools/vscode-diagnostics.js FILE
+python3 /home/cerie/Documents/coral-vscode/tools/lsp-diagnostics.py FILE
+```
+
+`lsp-probe.js` reports resolved positions and then the unresolved tokens, which
+is how the method-table gap was identified. Run it after each server change.
 
 Hover does not send the optional `range` field yet. Type spellings come from
 the compiler's own type printer, so diagnostics and hover follow real

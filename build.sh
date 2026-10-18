@@ -79,7 +79,7 @@ if command -v python3 >/dev/null && [ -d "$ROOT/../coral-vscode" ]; then
       | sed 's/^/   /' || echo '   (textmate check failed)'
   fi
   # language-server client: transport and compiler-resolution tests
-  for t in test-client test-find-compiler; do
+  for t in test-activation test-init-order test-client test-find-compiler; do
     if [ -f "$VS/tools/$t.js" ]; then
       printf '   %-20s' "$t"
       if ( cd "$VS" && node "tools/$t.js" >/dev/null 2>&1 ); then
