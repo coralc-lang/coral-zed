@@ -20,7 +20,7 @@ const INT_SUFFIX = '([uU][lL]{0,2}|[lL]{1,2}[uU]?)';
 module.exports = grammar({
   name: 'coral',
 
-  extras: $ => [/\s/, $.comment],
+  extras: $ => [/\s/, $.doc_comment, $.comment],
 
   word: $ => $.identifier,
 
@@ -185,6 +185,12 @@ module.exports = grammar({
     // ══════════════════════════════════════════════════════════════════
     // 1. Lexical
     // ══════════════════════════════════════════════════════════════════
+
+    // `/// doc` -- documentation comment. Declared before `comment` and listed
+    // first in `extras`, because `//` and `///` both match to end of line and
+    // the tie is broken by order. Without this a doc comment is
+    // indistinguishable from an ordinary one, so hover cannot surface it.
+    doc_comment: $ => token(seq('///', /[^\n]*/)),
 
     // `// line` and `/* block */` (block comments are not nested).
     comment: $ => token(choice(

@@ -9,6 +9,10 @@
 ; case_clause / etc.
 
 ; ── Comments ──
+; Documentation reads differently from scratch notes, so the two are
+; separated. doc_comment comes first so it wins over the general comment
+; capture that follows it.
+(doc_comment) @comment.documentation
 (comment) @comment
 
 ; ── Attributes ──

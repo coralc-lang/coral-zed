@@ -422,7 +422,10 @@ def build(x):
         ],
         'repository': {
             'comments': {'patterns': [
-                {'name': 'comment.line.double-slash.coral', 'match': '//.*$'},
+                # Documentation must be tried before the plain line comment:
+                # both match to end of line, so order decides which wins.
+                {'name': 'comment.line.documentation.coral', 'match': '///.*$'},
+                {'name': 'comment.line.double-slash.coral', 'match': '//(?=[^/]).*$'},
                 {'name': 'comment.block.coral', 'begin': '/\\*', 'end': '\\*/'},
             ]},
             'attributes': {'patterns': [{
