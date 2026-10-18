@@ -251,10 +251,13 @@ fi
 
 echo '== install'
 mkdir -p "$DST"
-rsync -a --delete \
+# Ship the built artefacts only. `target/` is ~140 MB of Cargo output and was
+# being installed wholesale; the Rust source stays (it is small and makes the
+# installed extension auditable), but build output never ships.
+rsync -a --delete --delete-excluded \
   --exclude '.git/' --exclude 'test/' --exclude 'install.sh' --exclude 'build.sh' \
-  --exclude '*.py' --exclude 'grammars/coral/' \
-  --exclude 'test/' --exclude 'coverage.py' \
+  --exclude '*.py' --exclude 'grammars/coral/' --exclude 'target/' \
+  --exclude 'Cargo.lock' \
   "$ROOT/" "$DST/"
 mkdir -p "$DST/grammars"
 cp "$ROOT/grammars/coral.wasm" "$DST/grammars/coral.wasm"

@@ -353,29 +353,42 @@ Both extensions treat `-32601` as "feature absent" and silently degrade.
 ## 12. Current state
 
 Verified against `~/.coral/bin/coralc 0.1.0` (`coralc --help` advertises
-`--serve  run the language server on stdio (LSP)`).
+`--serve  run the language server on stdio (LSP)`), including the coral-vscode
+live handshake (`tools/test-live-server.js`, 9/9) and the compiler-side suite
+(lifecycle, exit codes, UTF-16 columns, project report, cleared markers).
 
 **Working:**
 
 - `Content-Length` framing, exactly as specified above.
-- `initialize` → `{textDocumentSync: 1, hoverProvider: true}`.
-- `shutdown` / `exit` with correct exit code.
-- `textDocument/didOpen` / `didChange` / `didClose`.
-- `textDocument/publishDiagnostics` with `source: "coral"` and stable `P####`
-  codes.
-- `-32601` for unimplemented methods.
+- `initialize` → `{textDocumentSync: 1, hoverProvider: true}`; a request
+  before `initialize` answers **`-32002`**; a second `initialize` answers
+  `-32600`.
+- Malformed JSON answers **`-32700`**; non-object messages `-32600`.
+- `shutdown` / `exit` with the specified exit codes: **0** after `shutdown`,
+  **1** without; stdin EOF exits cleanly.
+- `textDocument/didOpen` / `didChange` / `didClose` (full text); `didClose`
+  publishes an empty set, clearing the document's markers.
+- `textDocument/publishDiagnostics` with `source: "coral"`, stable `P####` /
+  `T####` codes, UTF-16 `character` offsets, and an **empty array** whenever a
+  document becomes clean — silence is not "no errors".
+- **Whole-project error report**: opening any file analyzes the build entry
+  (`coral.crlb`) and publishes diagnostics for every file in the import
+  closure, so errors in files the open buffer never imports appear too. Files
+  that stop having records are cleared on the next report.
+- `textDocument/hover` returns the markdown-typed declaration of the
+  expression or symbol under the cursor (locals and top-level names).
+- `-32601` for unimplemented methods; `$/cancelRequest` accepted.
 
 **Gaps to close:**
 
 | Gap | Detail |
 | --- | --- |
-| `hoverProvider: true` but hover returns `null` | Advertised capability must be honoured. Every probed position returned `null`. |
 | No `documentSymbol` | `-32601`. Outline is empty. |
 | No `definition` / `references` | `-32601`. |
 | No `completion` | `-32601`. |
-| Never clears diagnostics | Publishes only when there is something to report; a document fixed back to clean keeps its stale errors. An **empty array must be sent**. |
-| Parser rejects valid Coral | `T at(usize i) { … }` fails; `T data[N]` yields `P0002 array size must be an integer literal`. The server's grammar is behind the real corpus — the tree-sitter grammar in `coral-zed` parses these files cleanly. |
+| No `coral/attributes` / `coral/typeInfo` | `-32601`. |
 
-That last row matters most: until the server's parser matches the language, its
-diagnostics will show false errors in correct files. **Parser parity is the
-critical path; every other method is blocked behind it.**
+Hover does not send the optional `range` field yet. Type spellings come from
+the compiler's own type printer, so diagnostics and hover follow real
+semantics rather than a parallel grammar — there is no separate parser to
+drift.
