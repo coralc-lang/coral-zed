@@ -7,7 +7,7 @@ repository = "https://github.com/coral-lang/coral-zed"
 authors = ["Coral Contributors"]
 themes = []
 icon = "icons/coral.svg"
-icon_themes = []
+icon_themes = ["icon_themes/coral.json"]
 languages = ["languages/coral"]
 capabilities = []
 

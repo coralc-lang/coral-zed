@@ -1,0 +1,23 @@
+{
+  "$schema": "https://zed.dev/schema/icon_themes/v0.3.0.json",
+  "name": "Coral",
+  "author": "Coral Contributors",
+  "themes": [
+    {
+      "name": "Coral",
+      "appearance": "light",
+      "file_suffixes": {
+        "crl": "coral",
+        "coral": "coral",
+        "crlb": "coral-project"
+      },
+      "file_stems": {
+        "modules.map": "coral-project"
+      },
+      "file_icons": {
+        "coral": { "path": "./icons/coral.svg" },
+        "coral-project": { "path": "./icons/coral-project.svg" }
+      }
+    }
+  ]
+}
