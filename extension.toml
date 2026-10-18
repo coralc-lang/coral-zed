@@ -6,6 +6,7 @@ description = "Coral programming language support - syntax highlighting, outline
 repository = "https://github.com/coral-lang/coral-zed"
 authors = ["Coral Contributors"]
 themes = []
+icon = "icons/coral.svg"
 icon_themes = []
 languages = ["languages/coral"]
 capabilities = []

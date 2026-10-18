@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Coral language logo</title>
+  <desc id="desc">A branching coral silhouette formed from smooth strokes.</desc>
+  <g fill="none" stroke="#ef9b7f" stroke-linecap="round" stroke-linejoin="round" stroke-width="6">
+    <path d="M32 56V39"/>
+    <path d="M32 45 20 34V22"/>
+    <path d="M32 42 44 31V18"/>
+    <path d="M20 34 12 27V17"/>
+    <path d="M44 31 53 24V13"/>
+    <path d="M32 39 28 28V13"/>
+    <path d="M32 35 37 25V11"/>
+  </g>
+  <g fill="#8fd0b8">
+    <circle cx="12" cy="14" r="4"/>
+    <circle cx="28" cy="10" r="4"/>
+    <circle cx="37" cy="8" r="4"/>
+    <circle cx="53" cy="10" r="4"/>
+  </g>
+  <path d="M17 56h30" fill="none" stroke="#8fd0b8" stroke-linecap="round" stroke-width="4"/>
+</svg>

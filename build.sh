@@ -257,7 +257,7 @@ mkdir -p "$DST"
 rsync -a --delete --delete-excluded \
   --exclude '.git/' --exclude 'test/' --exclude 'install.sh' --exclude 'build.sh' \
   --exclude '*.py' --exclude 'grammars/coral/' --exclude 'target/' \
-  --exclude 'Cargo.lock' \
+  --exclude 'Cargo.lock' --exclude 'build-web.sh' --exclude 'icons/coral-logo.svg' \
   "$ROOT/" "$DST/"
 mkdir -p "$DST/grammars"
 cp "$ROOT/grammars/coral.wasm" "$DST/grammars/coral.wasm"
