@@ -1,4 +1,3 @@
-*.o
-*.so
-node_modules/
-*.vsix
+target/
+extension.wasm
+Cargo.lock

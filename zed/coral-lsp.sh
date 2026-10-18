@@ -7,8 +7,9 @@
 #   3. coralc on PATH
 #   4. platform install roots
 #
-# coralc does not implement `serve` yet; until it does this prints why and
-# exits 126, which makes Zed skip the server without disturbing highlighting.
+# The compiler speaks LSP over stdio when given `--serve`. If it cannot be
+# found this prints why and exits 126, which makes Zed skip the server without
+# disturbing highlighting.
 
 set -uo pipefail
 
@@ -20,16 +21,16 @@ case "$(uname -s 2>/dev/null || echo Linux)" in
 esac
 
 # 1. explicit override
-[ -n "${CORALC:-}" ] && exec "$CORALC" serve "$@"
+[ -n "${CORALC:-}" ] && exec "$CORALC" --serve "$@"
 
 # 2. build-provided home
 if [ -n "${CORAL_HOME:-}" ] && [ -x "$CORAL_HOME/$exe" ]; then
-  exec "$CORAL_HOME/$exe" serve "$@"
+  exec "$CORAL_HOME/$exe" --serve "$@"
 fi
 
 # 3. PATH
 if command -v "$exe" >/dev/null 2>&1; then
-  exec "$(command -v "$exe")" serve "$@"
+  exec "$(command -v "$exe")" --serve "$@"
 fi
 
 # 4. platform install roots
@@ -45,7 +46,7 @@ for c in \
   "${local:+$local/coral/$exe}" \
   "${local:+$local/Programs/coral/$exe}"
 do
-  [ -n "$c" ] && [ -x "$c" ] && exec "$c" serve "$@"
+  [ -n "$c" ] && [ -x "$c" ] && exec "$c" --serve "$@"
 done
 
-die "no coralc found; set CORALC or add coralc to PATH (coralc serve is not implemented yet)"
+die "no coralc found; set CORALC or add coralc to PATH"

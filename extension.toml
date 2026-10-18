@@ -1,6 +1,6 @@
 id = "coral"
 name = "Coral"
-version = "0.2.0"
+version = "0.3.0"
 schema_version = 1
 description = "Coral programming language support - syntax highlighting, outline view, bracket matching, indentation."
 repository = "https://github.com/coral-lang/coral-zed"
@@ -15,7 +15,8 @@ repository = "file:///home/cerie/Documents/coral-zed"
 rev = "cb82925261eb4445a0fdcc581982cf9c5203f863"
 path = "grammars/coral"
 
-[language_servers]
+[language_servers.coral]
+languages = ["Coral"]
 
 [context_servers]
 

@@ -122,13 +122,131 @@ LAUNCHER="$ROOT/zed/coral-lsp.sh"
 if [ -f "$LAUNCHER" ]; then
   bash -n "$LAUNCHER" || exit 1
   printf '   %-20s' 'coral-lsp.sh'
-  # With no compiler it must exit 126 and say why, not crash.
-  if env -u CORALC -u CORAL_HOME PATH=/usr/bin:/bin "$LAUNCHER" >/dev/null 2>&1; then
+  # With no compiler it must exit 126 and say why, not crash. HOME is pointed
+  # at an empty dir so the platform install roots (~/.coral/bin and friends)
+  # cannot satisfy the lookup -- otherwise a developer with coralc installed
+  # would never exercise this branch.
+  EMPTYHOME=$(mktemp -d)
+  if env -u CORALC -u CORAL_HOME \
+         HOME="$EMPTYHOME" USERPROFILE="$EMPTYHOME" LOCALAPPDATA="$EMPTYHOME" \
+         PATH=/usr/bin:/bin "$LAUNCHER" >/dev/null 2>&1; then
     echo 'unexpected success'
+    rm -rf "$EMPTYHOME"
     exit 1
   else
+    rc=$?
+    rm -rf "$EMPTYHOME"
+    # 126 = "found nothing, told you why". Anything else is a real failure.
+    if [ "$rc" != 126 ]; then
+      echo "FAIL (expected exit 126, got $rc)"
+      exit 1
+    fi
     echo 'OK (exits 126 without a compiler)'
   fi
+fi
+
+echo '== live compiler handshake'
+# Talks to the real `coralc --serve` and asserts the wire format in PROTOCOL.md
+# still holds. This is the guard that would have caught the newline-vs-
+# Content-Length framing bug. Skips cleanly when no compiler is installed.
+if [ -f "$VS/tools/test-live-server.js" ]; then
+  printf '   %-20s' 'live-server'
+  if out=$( cd "$VS" && node tools/test-live-server.js 2>&1 ); then
+    echo "OK ($(echo "$out" | grep -c '^ok') checks)"
+  else
+    if echo "$out" | grep -q '^SKIP'; then
+      echo 'SKIP (no coralc installed)'
+    else
+      echo 'FAIL'
+      echo "$out" | sed 's/^/      /'
+      exit 1
+    fi
+  fi
+fi
+
+echo '== build extension wasm'
+# The extension contributes the language server itself (language_server_command),
+# so this artifact is what makes `coralc --serve` start for every user who
+# installs the extension. Built offline: wasm32-wasip2 and
+# zed_extension_api are both already present locally.
+if command -v cargo >/dev/null 2>&1; then
+  printf '   %-20s' 'extension.wasm'
+  if ( cargo build --release --offline --target wasm32-wasip2 ) >/tmp/cargo.log 2>&1; then
+    WASM="$ROOT/target/wasm32-wasip2/release/coral_extension.wasm"
+    cp "$WASM" "$ROOT/extension.wasm"
+    echo "OK ($(stat -c%s "$ROOT/extension.wasm") bytes)"
+  else
+    echo 'FAIL'
+    tail -20 /tmp/cargo.log | sed 's/^/      /'
+    exit 1
+  fi
+else
+  printf '   %-20s' 'extension.wasm'
+  echo 'SKIP (cargo not installed)'
+fi
+
+echo '== install launcher'
+# The launcher must be installed by the build, not by hand. A stale copy in
+# ~/.local/bin silently shadows the repo copy and is how the extension ended up
+# invoking `coralc serve` (no --) after the flag was corrected here.
+BIN_DEST="${HOME}/.local/bin"
+if [ -w "$BIN_DEST" ] || mkdir -p "$BIN_DEST" 2>/dev/null; then
+  install -m 0755 "$ROOT/zed/coral-lsp.sh" "$BIN_DEST/coral-lsp"
+  printf '   %-20s' 'coral-lsp'
+  if grep -q -- '--serve' "$BIN_DEST/coral-lsp"; then
+    echo "OK ($BIN_DEST/coral-lsp)"
+  else
+    echo 'FAIL (installed launcher does not use --serve)'
+    exit 1
+  fi
+else
+  printf '   %-20s' 'coral-lsp'
+  echo "SKIP (cannot write $BIN_DEST)"
+fi
+
+echo '== sync extension manifest'
+# Zed caches each extension's manifest in extensions/index.json and will not
+# re-read extension.toml for an already-installed extension. We install by
+# rsync rather than through Zed's own installer, so nothing refreshes that
+# cache -- which silently hid the [language_servers.coral] section until the
+# manifest was corrected. Keep them in sync automatically.
+IDX="${XDG_DATA_HOME:-$HOME/.local/share}/zed/extensions/index.json"
+if [ -f "$IDX" ]; then
+  printf '   %-20s' 'index.json'
+  python3 - "$IDX" "$ROOT/extension.toml" <<'PYEOF'
+import json, re, sys
+idx_path, toml_path = sys.argv[1], sys.argv[2]
+text = open(toml_path).read()
+def scalar(k, d=None):
+    m = re.search(rf'^{k}\s*=\s*"([^"]*)"', text, re.M)
+    return m.group(1) if m else d
+servers = {}
+for m in re.finditer(r'^\[language_servers\.([\w.-]+)\]\s*(.*?)(?=^\[|\Z)', text, re.M | re.S):
+    name, body = m.group(1), m.group(2)
+    langs = re.search(r'^languages\s*=\s*\[(.*?)\]', body, re.M | re.S)
+    servers[name] = {
+        "language": None,
+        "languages": re.findall(r'"([^"]+)"', langs.group(1)) if langs else [],
+        "language_ids": {},
+        "code_action_kinds": None,
+    }
+d = json.load(open(idx_path))
+entry = d.get("extensions", {}).get("coral")
+if entry is None:
+    print("SKIP (coral not in index)"); raise SystemExit(0)
+m = entry["manifest"]
+m["version"] = scalar("version", m.get("version"))
+# lib is Rust whenever an extension.wasm is shipped
+import os
+if os.path.exists(os.path.join(os.path.dirname(toml_path), "extension.wasm")):
+    m["lib"] = {"kind": "Rust", "version": m["version"]}
+m["language_servers"] = servers
+json.dump(d, open(idx_path, "w"), indent=2)
+print(f"OK (v{m['version']}, servers: {','.join(servers) or 'none'})")
+PYEOF
+else
+  printf '   %-20s' 'index.json'
+  echo 'SKIP (no extension index yet)'
 fi
 
 echo '== install'
