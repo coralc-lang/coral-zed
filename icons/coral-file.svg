@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Coral">
+  <title>Coral</title>
+  <!-- Bold geometric C: a ring with a notch removed from the right.
+       Built from three subpaths with fill-rule="evenodd", so the inner
+       circle punches the hole and the rectangle punches the opening.
+       Thick strokes and no detail, so it survives being drawn at 16px. -->
+  <path fill="#FF6B5A" fill-rule="evenodd" d="
+    M32 4a28 28 0 1 0 0 56 28 28 0 1 0 0-56z
+    M32 17a15 15 0 1 1 0 30 15 15 0 1 1 0-30z
+    M41 12h23v40H41z"/>
+</svg>

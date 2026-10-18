@@ -7,15 +7,15 @@
       "name": "Coral",
       "appearance": "light",
       "file_suffixes": {
-        "crl": "coral",
-        "coral": "coral",
+        "crl": "coral-file",
+        "coral": "coral-file",
         "crlb": "coral-project"
       },
       "file_stems": {
         "modules.map": "coral-project"
       },
       "file_icons": {
-        "coral": { "path": "./icons/coral.svg" },
+        "coral-file": { "path": "./icons/coral-file.svg" },
         "coral-project": { "path": "./icons/coral-project.svg" }
       }
     }
