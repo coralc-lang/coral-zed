@@ -190,24 +190,27 @@ On `didClose` the server should clear that document's diagnostics.
 Every method is optional. An absent capability means the editor hides the
 affordance; it never surfaces an error.
 
-| Method | Direction | Phase | Purpose |
-| --- | --- | --- | --- |
-| `initialize` / `initialized` | both | required | Handshake |
-| `shutdown` / `exit` | both | required | Teardown |
-| `textDocument/didOpen` / `didChange` / `didClose` | editor → server | required | Sync |
-| `textDocument/publishDiagnostics` | server → editor | required | Errors |
-| `textDocument/hover` | editor → server | target | Type under cursor |
-| `textDocument/documentSymbol` | editor → server | target | Outline |
-| `textDocument/definition` | editor → server | target | Go to declaration |
-| `textDocument/references` | editor → server | target | Find uses |
-| `textDocument/completion` | editor → server | target | Completions |
-| `coral/attributes` | editor → server | target | Attributes inside `#[[…]]` |
-| `coral/typeInfo` | editor → server | target | Node inspector |
+| Method | Direction | Purpose |
+| --- | --- | --- |
+| `initialize` / `initialized` | both | Handshake |
+| `shutdown` / `exit` | both | Teardown |
+| `textDocument/didOpen` / `didChange` / `didClose` | editor → server | Sync |
+| `textDocument/publishDiagnostics` | server → editor | Errors |
+| `textDocument/hover` | editor → server | Type under cursor |
+| `textDocument/completion` | editor → server | Completions |
+| `textDocument/signatureHelp` | editor → server | Call arguments |
+| `textDocument/documentSymbol` | editor → server | Outline |
+| `textDocument/definition` / `typeDefinition` / `references` | editor → server | Navigation |
+| `textDocument/documentHighlight` | editor → server | Occurrences |
+| `textDocument/semanticTokens/full` | server → editor | Type-aware colour |
+| `textDocument/inlayHint` | server → editor | Inferred types |
+| `textDocument/codeAction` | server → editor | Quick fixes |
+| `coral/attributes` | editor → server | Attributes inside `#[[…]]` |
+| `coral/typeInfo` | editor → server | Node inspector |
 
-`$/cancelRequest` and `$/progress` are optional server→client/client→server
-extras; neither extension depends on them.
-
----
+The full list, with phasing and current implementation status, is
+[§11 Capability matrix](#11-capability-matrix). The exact payloads for type
+information are in [§9b](#9b-type-information).
 
 ## 6. `textDocument/publishDiagnostics` (server → editor)
 
@@ -322,6 +325,167 @@ affordances:
 
 ---
 
+## 9b. Type information
+
+This is the core of what makes Coral pleasant to edit, and it is three
+separate mechanisms. None of them work today.
+
+### Hover — the type and signature under the cursor
+
+`Hover | null`. `null` is valid; an unimplemented feature must be `-32601`
+instead, otherwise editors will keep offering a hover that yields nothing.
+
+```jsonc
+{"contents": [
+    {"language": "coral", "value": "fn at(usize i) -> T"},
+    "
+Array element access. Returns `self.data[i]`.
+"
+  ],
+ "range": {"start": {"line": 4, "character": 5}, "end": {"line": 4, "character": 7}}}
+```
+
+Contents is `MarkupContent` or an array mixing `MarkedString` and markdown.
+Both clients advertise `hover.contentFormat: ["markdown"]`.
+
+### Semantic tokens — colour by meaning, not by syntax
+
+Tree-sitter knows the *shape* of `T at(usize i)`; only the compiler knows `T`
+is a type parameter and `i` is a parameter. Semantic tokens close that gap.
+This is what makes types visually distinct from values.
+
+```jsonc
+// result: { "data": [ ... ] } — flat u32 array, 5 ints per token
+{"data": [0, 0, 4, 2, 0, 5, 0, 2, 0, 5, 0, 5, 2, 0, 0]}
+```
+
+Token types and modifiers are declared in the server's initialize result:
+
+```jsonc
+"semanticTokensProvider": {
+  "legend": {
+    "tokenTypes": ["type", "parameter", "property", "function", "method",
+                   "struct", "genericParameter", "keyword"],
+    "tokenModifiers": ["declaration", "readonly"]
+  },
+  "full": true, "range": false
+}
+```
+
+Encoding: `deltaLine`, `deltaStartChar`, `length`, `tokenType`, `tokenModifiers`
+— all relative to the previous token, sorted, non-overlapping, never spanning
+lines.
+
+> **Correction.** An earlier revision said the editor never asks for semantic
+> tokens, on the grounds that highlighting belongs to tree-sitter. That is right
+> for *syntax* and wrong for *types*: tree-sitter cannot know that `T` is a type
+> parameter. Zed supports `"semantic_tokens": "combined"` (LSP colours on top
+> of tree-sitter) and `"full"`. VS Code enables this automatically when the
+> server advertises the capability.
+
+### Inlay hints — inferred types inline
+
+```jsonc
+{"label": ": T", "position": {"line": 8, "character": 20},
+ "kind": 1, "paddingRight": true}
+```
+
+`kind` 1 is Type, 2 Parameter. Particularly valuable for `let`/`const`
+bindings whose type is not written.
+
+### Completion and signature help
+
+`textDocument/completion` returns `CompletionItem[] | CompletionList | null`.
+For Coral the trigger characters matter more than usual:
+
+| Trigger | Completes |
+| --- | --- |
+| `.` | fields and methods on the receiver, narrowed to its type |
+| `::` | module paths, types, associated constants |
+| `#[[` | attributes, from `coral/attributes` |
+| `` ` `` or identifier | declarations in scope |
+
+```jsonc
+{"label": "count", "kind": 2, "detail": "fn count() -> usize",
+ "documentation": {"kind": "markdown", "value": "Number of elements."},
+ "insertText": "count()", "sortText": "0000"}
+```
+
+`completionItem/resolve` fills in `documentation` lazily, so the initial
+response stays small. Both clients advertise `completionItem.snippetSupport`
+and `documentationFormat: markdown`.
+
+`textDocument/signatureHelp` matters more for Coral than most languages
+because declarations are type-first and the return type sits in the middle:
+
+```jsonc
+{"signatures": [{"label": "at(usize i) -> T",
+                 "parameters": [{"label": "usize i"}, {"label": "-> T"}],
+                 "activeParameter": 0}],
+ "activeSignature": 0}
+```
+
+### Occurrences, navigation, quick fixes
+
+- `textDocument/documentHighlight` — every other occurrence of the symbol
+  under the cursor (`Read`/`Write`/`Text` document highlight kinds). Cheap, and
+  the most visible quality-of-life win after hover.
+- `textDocument/definition` returns `Location | Location[] | LocationLink[] | null`.
+  Both clients advertise `definition.linkSupport`, which is preferred: it
+  carries `originSelectionRange` so the editor can highlight the declaration
+  site without a second round trip.
+- `textDocument/typeDefinition` — for Coral this is often the more useful jump:
+  from a `T` use to the `struct` or `variant` that defines it.
+- `textDocument/codeAction` — quick fixes for diagnostics. Coral is a good fit
+  because most diagnostics are mechanical (`P0002` array size, unused import).
+  A fix is returned as a `WorkspaceEdit`; apply it with
+  `workspace/applyEdit`, which both clients advertise support for.
+
+## 9c. Messages the server must accept
+
+Beyond document sync, a conforming server must tolerate these without erroring:
+
+| Message | From | Handling |
+| --- | --- | --- |
+| `workspace/didChangeConfiguration` | client | Accept. Zed sends it immediately after `initialized`. Must not be treated as unknown. |
+| `workspace/didChangeWorkspaceFolders` | client | Accept, optionally re-resolve libraries. |
+| `workspace/didChangeWatchedFiles` | client | Accept; useful if std sources change on disk. |
+| `$/setTrace`, `$/cancelRequest`, `$/progress` | both | Optional. Honour cancellation before expensive analysis. |
+
+## 9d. Messages the server should send
+
+Without these the compiler fails silently, which is exactly how `--serve`
+behaved before `build.crlb` handling was fixed:
+
+```jsonc
+// surface a fatal configuration problem instead of exiting quietly
+{"method": "window/showMessage",
+ "params": {"type": 1, "message": "coralc: no build.crlb found in the project root"}}
+
+// progress for whole-project analysis
+{"method": "window/logMessage",
+ "params": {"type": 3, "message": "indexed 412 files in 84 ms"}}
+```
+
+`type` is 1 Error, 2 Warning, 3 Info, 4 Log. These are permitted even while
+`initialize` is in flight.
+
+## 9e. Position encoding
+
+LSP 3.17 added `general.positionEncodings`. The server should pick the first
+encoding the client lists, defaulting to **UTF-16 code units**:
+
+```jsonc
+// client -> initialize
+"capabilities": {"general": {"positionEncodings": ["utf-16", "utf-8"]}},
+"positionEncoding": "utf-16"      // server -> initialize, echo the choice
+```
+
+`publishDiagnostics` positions must use the negotiated encoding. Coral source
+is UTF-8 and may contain non-ASCII identifiers and string literals, so this
+is a real off-by-N risk rather than a theoretical one. Both clients currently
+advertise UTF-16 only.
+
 ## 10. Errors
 
 | Code | Meaning | When |
@@ -340,15 +504,114 @@ Both extensions treat `-32601` as "feature absent" and silently degrade.
 
 ---
 
-## 11. What the editor never asks for
+## 11. Capability matrix
 
-- **Semantic tokens.** Highlighting belongs to tree-sitter/TextMate. A second
-  highlighter would only drift.
-- **Formatting.** Coral has no formatter.
-- **Incremental parse state, module graphs, build orchestration.** Compiler
-  internals.
+Phase 1 is the minimum that makes the editor feel alive. Phase 2 is what a
+mature Coral server should grow into. Phases 3+ are optional refinements.
 
----
+| Method | Purpose | Phase | Status in `coralc 0.1.0` |
+| --- | --- | --- | --- |
+| `textDocument/publishDiagnostics` | errors, warnings | 1 | works (empty set missing) |
+| `textDocument/hover` | signature, type, docs | 1 | returns `null` |
+| `textDocument/documentSymbol` | outline | 1 | `-32601` |
+| `textDocument/definition` | go to declaration | 1 | `-32601` |
+| `textDocument/completion` | member + path completion | 1 | `-32601` |
+| `textDocument/signatureHelp` | call argument help | 1 | `-32601` |
+| `textDocument/documentHighlight` | occurrence highlighting | 2 | `-32601` |
+| `textDocument/semanticTokens/full` | type-aware colouring | 2 | `-32601` |
+| `textDocument/inlayHint` | inferred types inline | 2 | `-32601` |
+| `textDocument/references` | find uses | 2 | `-32601` |
+| `textDocument/typeDefinition` | jump to a type | 2 | `-32601` |
+| `textDocument/codeAction` | quick fixes | 2 | `-32601` |
+| `textDocument/foldingRange` | fold bodies | 2 | `-32601` |
+| `textDocument/rename` | rename safely | 3 | `-32601` |
+| `workspace/symbol` | project-wide search | 3 | `-32601` |
+| `textDocument/prepareCallHierarchy` | callers/callees | 3 | `-32601` |
+| `textDocument/diagnostic` | pull diagnostics (3.17) | 3 | `-32601` |
+| `workspace/diagnostic` | workspace pull (3.18) | 3 | `-32601` |
+| `textDocument/selectionRange` | expand selection | 3 | `-32601` |
+| `textDocument/codeLens`, `textDocument/formatting` | not wanted | — | `-32601` by design |
+
+`textDocument/colorProvider`, `documentLink`, and `inlineValue` are
+deliberately out of scope for Coral.
+
+### Responding correctly
+
+Any method not implemented must return **`-32601`**. That is how an editor
+learns a feature is absent and hides the affordance. Silence is worse than
+`-32601`: the editor waits for a response that never comes.
+
+## 11b. Full method audit
+
+Probed against `coralc 0.1.0` with all 51 standard requests plus 12
+notifications. The server answered every one and stayed alive, returning
+`-32601` for all 50 it does not implement. **Rejecting correctly is half the
+job** — an editor hides the affordance rather than waiting forever.
+
+### Build first — the server is not usable without these
+
+| Method | Why it matters for Coral |
+| --- | --- |
+| `textDocument/publishDiagnostics` *(empty set)* | Only implemented method that works. Must send `[]` to clear. |
+| `textDocument/hover` | Advertised but always `null`. |
+| `textDocument/documentSymbol` | Outline is empty. `detail` carries the type-first signature. |
+| `textDocument/definition` | Jump to declaration. |
+| `textDocument/completion` + `completionItem/resolve` | The single biggest daily-use feature. |
+| `textDocument/signatureHelp` | Type-first declarations put the return type mid-signature. |
+
+### Build next — what makes it feel like a real language
+
+| Method | Why |
+| --- | --- |
+| `textDocument/semanticTokens/full` (+ `/delta`, `/range`) | Only the compiler knows `T` is a type parameter. Needs `positionEncoding`. |
+| `textDocument/documentHighlight` | Occurrence highlighting. Cheapest quality-of-life win. |
+| `textDocument/typeDefinition` | From a `T` use to its `struct`/`variant`. Often the more useful jump. |
+| `textDocument/references` | Shared resolution with definition and highlight. |
+| `textDocument/codeAction` + `workspace/applyEdit` | Quick fixes; most Coral diagnostics are mechanical. |
+| `textDocument/inlayHint` (+ `inlayHint/resolve`) | Inferred types on bindings. |
+| `textDocument/foldingRange` | Struct and function bodies. |
+| `textDocument/prepareTypeHierarchy`, `typeHierarchy/supertypes`, `typeHierarchy/subtypes` | **Coral-specific value**: `trait` and `extend` make a real type hierarchy. Cheap once resolution exists. |
+| `workspace/executeCommand` | Needed to back code actions and any command the editor surfaces. |
+| `window/workDoneProgress/create` + `$/progress` | Whole-project indexing takes real time; progress beats a frozen editor. |
+| `languageStatus` (3.18) | Compiler status in the editor status bar — "indexing", "5 errors", "no build.crlb". |
+| `window/showMessage` / `window/logMessage` | Report fatal setup problems instead of exiting silently. |
+
+### Build if you want the full story
+
+| Method | Why |
+| --- | --- |
+| `textDocument/declaration` | Distinct from `definition`: where a symbol is *declared* vs *defined*. Coral has both. |
+| `textDocument/prepareRename` + `rename` | Safe rename with shadowing checks. |
+| `textDocument/prepareCallHierarchy`, `callHierarchy/incomingCalls`, `outgoingCalls` | Callers/callees — valuable in a systems language. |
+| `workspace/symbol` + `workspaceSymbol/resolve` | Project-wide symbol search. |
+| `textDocument/diagnostic` + `workspace/diagnostic` | Pull diagnostics (3.17/3.18): versioned results, `relatedInformation`, workspace-wide. |
+| `textDocument/selectionRange` | Expand selection structurally. |
+| `workspace/willRenameFiles` | **Coral-specific value**: rename a file and fix `import` statements. |
+| `textDocument/willSaveWaitUntil` | Compute edits before save. Pairs with `willSave`/`didSave`. |
+
+### Notifications to accept
+
+`workspace/didChangeConfiguration` (**Zed sends this unprompted**),
+`workspace/didChangeWatchedFiles`, `workspace/didChangeWorkspaceFolders`,
+`textDocument/willSave`, `textDocument/didSave`, `workspace/didCreateFiles`,
+`workspace/didDeleteFiles`, `workspace/didRenameFiles`, `$/setTrace`,
+`$/progress`.
+
+All were sent during the audit and none crashed the server. They should be
+tolerated silently even if ignored.
+
+### Deliberately not built
+
+| Method | Reason |
+| --- | --- |
+| `textDocument/formatting`, `rangeFormatting`, `onTypeFormatting` | Coral has no formatter. Return `-32601` permanently. |
+| `textDocument/codeLens` (+ `resolve`) | Usually annotates test counts or references. Revisit only if Coral gains runnable tests. |
+| `textDocument/documentColor`, `colorPresentation` | No colour literals in the language. |
+| `textDocument/documentLink` (+ `resolve`) | No URLs in source. |
+| `textDocument/inlineValue` | Debugger protocol, not a language server concern. |
+| `textDocument/linkedEditingRange` | No delimiter pairs worth linking. |
+| `notebookDocument/*` | Only if Coral notebooks exist. |
+| `textDocument/implementation` | Meaningless without an inheritance model beyond traits, which `typeHierarchy` covers. |
 
 ## 12. Current state
 

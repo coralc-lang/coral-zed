@@ -49,6 +49,17 @@ impl zed::Extension for CoralExtension {
              language server features"
             .to_string())
     }
+
+    /// Nothing to send yet. `coralc` takes no initialization options, but Zed
+    /// asks for this on every start, so returning `None` is the explicit way
+    /// to say "no options" rather than leaving it unimplemented.
+    fn language_server_initialization_options(
+        &mut self,
+        _language_server_id: &zed::LanguageServerId,
+        _worktree: &zed::Worktree,
+    ) -> Result<Option<serde_json::Value>, String> {
+        Ok(None)
+    }
 }
 
 zed::register_extension!(CoralExtension);

@@ -1,6 +1,6 @@
 id = "coral"
 name = "Coral"
-version = "0.3.0"
+version = "0.4.0"
 schema_version = 1
 description = "Coral programming language support - syntax highlighting, outline view, bracket matching, indentation."
 repository = "https://github.com/coral-lang/coral-zed"
