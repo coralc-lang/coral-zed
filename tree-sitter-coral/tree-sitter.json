@@ -20,7 +20,7 @@
       { "name": "Coral Contributors" }
     ],
     "links": {
-      "repository": "https://github.com/coral-lang/tree-sitter-coral"
+      "repository": "https://github.com/coralc-lang/coral-zed"
     }
   },
   "bindings": {
