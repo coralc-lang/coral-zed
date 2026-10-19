@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Compile the coral tree-sitter grammar to a WebAssembly module and install
-# the extension into Zed. Fully offline: no wasi-sdk, no downloads.
+# the extension into Zed. The grammar build needs no wasi-sdk; the Rust
+# extension is built with cargo for wasm32-wasip2.
 #
 # The generated parser makes no libc calls, so stub headers stand in for
 # stdlib.h / string.h / assert.h / stdio.h and the object is linked
@@ -10,7 +11,7 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-G="$ROOT/grammars/coral"
+G="$ROOT/tree-sitter-coral"
 DST="${1:-${ZED_EXT_DIR:-$HOME/.local/share/zed/extensions/installed/coral}}"
 INC="$(mktemp -d)"
 trap 'rm -rf "$INC"' EXIT
@@ -50,7 +51,7 @@ echo '== verify queries'
 # A broken query makes Zed fail to load the language at all, so nothing gets
 # highlighted. Validate every query against real coral source before
 # installing, and refuse to ship a bad one.
-PROBE=/home/cerie/Documents/coralc/lib/std/x86_64/linux/collections/arr.crl
+PROBE="${CORAL_REPO:-$ROOT/../coral}/lib/std/x86_64/linux/collections/arr.crl"
 if [ ! -f "$PROBE" ]; then
   PROBE=/tmp/.__coral_probe.crl
   printf 'pub struct S<T> {\n    #[[inline]]\n    T* ptr() const { return (T*)self.data; }\n}\nvar p = S { .data = null };\nfor (usize i = 0; i < 3; i++) { switch (i) { _ => { break }, else => { continue; }, } }\n' > "$PROBE"
@@ -256,7 +257,7 @@ mkdir -p "$DST"
 # installed extension auditable), but build output never ships.
 rsync -a --delete --delete-excluded \
   --exclude '.git/' --exclude 'test/' --exclude 'install.sh' --exclude 'build.sh' \
-  --exclude '*.py' --exclude 'grammars/coral/' --exclude 'target/' \
+  --exclude '*.py' --exclude 'tree-sitter-coral/' --exclude 'target/' \
   --exclude 'Cargo.lock' --exclude 'build-web.sh' --exclude 'icons/coral-logo.svg' \
   "$ROOT/" "$DST/"
 mkdir -p "$DST/grammars"

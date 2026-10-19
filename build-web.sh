@@ -18,7 +18,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-G="$ROOT/grammars/coral"
+G="$ROOT/tree-sitter-coral"
 OUT="${1:-$ROOT/coral-web.wasm}"
 mkdir -p "$(dirname "$OUT")"
 WEB_ABI=14

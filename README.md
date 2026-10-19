@@ -1,10 +1,12 @@
 # Coral for Zed
 
-Tree-sitter based syntax highlighting, bracket matching, auto-indentation, and
-code outline for the [Coral](https://coral-lang) programming language.
+Tree-sitter based syntax highlighting, bracket matching, auto-indentation,
+code outline, and language server integration for the
+[Coral](https://github.com/coralc-lang/coralc) programming language.
 
-This extension is deliberately *editor-only*: it ships a parser and queries.
-It does **not** ship a language server, formatter, or debugger.
+The extension ships the parser and queries plus a small Rust `extension.wasm`
+that starts `coralc --serve` when the compiler is on `PATH`. It does not bundle
+the compiler, formatter, or debugger.
 
 ---
 
@@ -12,41 +14,44 @@ It does **not** ship a language server, formatter, or debugger.
 
 | Path | Purpose |
 | --- | --- |
-| `extension.toml` | Extension manifest. Registers the `coral` grammar from a local `file://` git repo. |
-| `grammars/coral/grammar.js` | The grammar. The single source of truth for syntax. |
-| `grammars/coral/src/parser.c` | Generated parser (regenerate with `tree-sitter generate`). |
-| `grammars/coral.wasm` | The artifact Zed actually loads. |
+| `extension.toml` | Extension manifest. Declares the `coral` grammar and language server. |
+| `src/lib.rs` | Finds `coralc` (or the `coral-lsp` launcher) and starts it with `--serve`. |
+| `tree-sitter-coral/grammar.js` | The grammar. The single source of truth for syntax. |
+| `tree-sitter-coral/src/parser.c` | Generated parser (regenerate with `tree-sitter generate`). |
+| `grammars/coral.wasm` | The grammar artifact Zed loads. |
 | `languages/coral/config.toml` | Language metadata: suffixes, comments, brackets, tab size. |
 | `languages/coral/highlights.scm` | Syntax highlighting queries. |
 | `languages/coral/indents.scm` | Auto-indentation ranges. |
 | `languages/coral/outline.scm` | Outline / structure queries. |
 | `languages/coral/brackets.scm` | Bracket matching. |
 | `languages/coral/textobjects.scm` | Vim-mode `af` / `if` / `ac` / `ic` text objects. |
-| `build.sh` | Builds the wasm grammar and installs the extension, offline. |
+| `build.sh` | Builds the grammar and extension wasm, then installs locally. |
 | `test/` | Snippet corpus and hand-written examples used to validate the grammar. |
 
 ---
 
 ## Building and installing
 
-The build needs **no network access and no wasi-sdk**. The generated parser
-makes no libc calls, so four stub headers stand in for the standard library and
-the object is linked position-independently so `wasm-ld` emits the `dylink`
-section that Zed's loader parses.
+The grammar build needs `tree-sitter`, `clang` with the `wasm32` target, and
+`wasm-ld` (from `lld`). The extension needs Rust with the
+`wasm32-wasip2` target:
 
 ```sh
+rustup target add wasm32-wasip2
 ./build.sh                      # build + install to the default location
 ./build.sh /some/other/dir      # build + install elsewhere
 ```
 
-Requirements: `tree-sitter` (CLI), `clang` with the `wasm32` target, and
-`wasm-ld` (from `lld`).
+Most users should install Coral with the project installer instead; it places
+the compiler and the extension together:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/coralc-lang/coralc/main/install.sh | sh
+```
 
 Zed loads extensions from `~/.local/share/zed/extensions/installed/`. An
 extension only loads if it is also present in that directory's `index.json`, so
-`build.sh` installs the tree and the grammar must be registered there. Name the
-directory `coral` and the grammar `coral` and Zed picks everything up on
-restart.
+`build.sh` installs the tree and refreshes the manifest entry.
 
 ---
 
@@ -253,51 +258,45 @@ rejected in `#[[…]]`.
 
 ## Editor ↔ compiler communication
 
-`coralc` does not speak LSP yet. [`PROTOCOL.md`](./PROTOCOL.md) is the contract:
-JSON-RPC 2.0 over stdio, one object per line, with
-`publishDiagnostics`, `documentSymbol`, `hover`, `definition`, `references`,
-`completion`, and two Coral-specific methods (`coral/attributes`,
-`coral/typeInfo`).
+The extension contributes the language server itself in `extension.toml`:
 
-### The hook
-
-`zed/coral-lsp.sh` is the launcher. It resolves the compiler and execs it, so
-Zed never has to know where coralc lives:
-
-```sh
-zed/install.sh          # -> ~/.local/bin/coral-lsp
+```toml
+[language_servers.coral]
+name = "Coral Language Server"
+languages = ["Coral"]
 ```
 
-Then point Zed at it in `~/.config/zed/settings.json`:
+`src/lib.rs` implements `language_server_command`. It first asks
+`worktree.which("coralc")` and runs `coralc --serve`; if that is absent it falls
+back to `coral-lsp`, the launcher installed by `build.sh`, which also searches
+`$CORALC`, `$CORAL_HOME/coralc`, and the platform install roots. If neither is
+present the language server stays off, but highlighting still works.
+
+The extension sandbox cannot probe arbitrary filesystem paths, so discovery is
+limited to binaries on `PATH`. No user settings are required. To pin a specific
+compiler, use Zed's standard language server override:
 
 ```json
-"Coral": { "language_servers": ["coral", "..."] },
-"language_servers": {
-  "coral": {
-    "source": "custom",
-    "command": { "path": "coral-lsp", "args": [] }
+{
+  "language_servers": {
+    "coral": { "command": { "path": "/path/to/coralc", "args": ["--serve"] } }
   }
 }
 ```
 
-Until `coralc serve` exists the launcher exits 126 with a reason on stderr, and
-Zed simply runs no Coral server. Highlighting is unaffected because it needs no
-compiler.
+`coralc --serve` speaks LSP over stdio. [`PROTOCOL.md`](./PROTOCOL.md) is the
+contract: JSON-RPC 2.0, one object per line, with `publishDiagnostics`,
+`documentSymbol`, `hover`, `definition`, `references`, `completion`, and two
+Coral-specific methods (`coral/attributes`, `coral/typeInfo`).
 
-This is deliberately *not* a `[language_servers.coral]` entry in
-`extension.toml`: Zed implements `language_server_command` in a compiled
-`extension.wasm`, which would need the wasi-sdk and therefore a download. The
-settings route keeps the whole extension build-free.
+### Where the launcher looks for the compiler
 
-### Where the compiler is looked for
+First hit wins:
 
-First hit wins, identically in both editors:
-
-1. explicit setting — `language_servers.coral.path` / `coral.languageServer.path`
-2. `$CORALC`
-3. `$CORAL_HOME/coralc`
-4. `coralc` on `PATH`
-5. platform roots — `~/.coral/bin`, `~/.local/bin`, `~/bin`,
+1. `$CORALC`
+2. `$CORAL_HOME/coralc`
+3. `coralc` on `PATH`
+4. platform roots — `~/.coral/bin`, `~/.local/bin`, `~/bin`,
    `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`; on Windows
    `%LOCALAPPDATA%\coral`, `%LOCALAPPDATA%\Programs\coral`
 

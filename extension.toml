@@ -2,8 +2,8 @@ id = "coral"
 name = "Coral"
 version = "0.4.0"
 schema_version = 1
-description = "Coral programming language support - syntax highlighting, outline view, bracket matching, indentation."
-repository = "https://github.com/coral-lang/coral-zed"
+description = "Coral programming language support - syntax highlighting, outline view, bracket matching, indentation, and language server integration."
+repository = "https://github.com/coralc-lang/coral-zed"
 authors = ["Coral Contributors"]
 themes = []
 icon = "icons/coral.svg"
@@ -12,11 +12,12 @@ languages = ["languages/coral"]
 capabilities = []
 
 [grammars.coral]
-repository = "file:///home/cerie/Documents/coral-zed"
-rev = "cb82925261eb4445a0fdcc581982cf9c5203f863"
-path = "grammars/coral"
+repository = "https://github.com/coralc-lang/coral-zed"
+rev = "af65d23725987e605a7847b57b56192594fa3065"
+path = "tree-sitter-coral"
 
 [language_servers.coral]
+name = "Coral Language Server"
 languages = ["Coral"]
 
 [context_servers]

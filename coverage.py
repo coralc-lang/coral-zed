@@ -10,10 +10,11 @@ Only *innermost* error nodes are bucketed. An ERROR that wraps a whole file is
 a symptom; the small node inside it is the cause, so counting the outer ones
 just tells you which files are broken rather than why.
 """
-import argparse, collections, concurrent.futures as cf, pathlib, re, subprocess, sys
+import argparse, collections, concurrent.futures as cf, os, pathlib, re, subprocess, sys
 
-ROOT = pathlib.Path('/home/cerie/Documents/coralc')
-GRAMMAR = pathlib.Path('/home/cerie/Documents/coral-zed/grammars/coral')
+HERE = pathlib.Path(__file__).resolve().parent
+ROOT = pathlib.Path(os.environ.get('CORAL_REPO', HERE.parent / 'coral'))
+GRAMMAR = HERE / 'tree-sitter-coral'
 NODE = re.compile(r'\((ERROR|MISSING)[^\[]*?\[(\d+), (\d+)\] - \[(\d+), (\d+)\]')
 
 # Directories that hold Coral source. `lib` is the standard library and

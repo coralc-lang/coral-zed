@@ -12,7 +12,7 @@ the wire format changes rarely, the state of the integration changes often.
 | --- | --- | --- |
 | Protocol spec | `PROTOCOL.md` (both repos) | Normative |
 | VS Code client | `coral-vscode/extension.js` | Done, 8 transport tests |
-| Zed launcher | `coral-zed/zed/coral-lsp.sh` | Done, installed to `~/.local/bin/coral-lsp` |
+| Zed extension client | `coral-zed/src/lib.rs` | Done, starts `coralc --serve`; launcher fallback |
 | Compiler lookup | both | Done |
 | Stand-in server | `coral-vscode/tools/fake-coralc.js` | Mirrors the real wire format |
 | Build gating | `coral-zed/build.sh` | Fails on regression |
@@ -78,8 +78,8 @@ fn language_server_command(&mut self, _: &LanguageServerId, worktree: &Worktree)
 ```
 
 It resolves `coralc` directly and only falls back to the `coral-lsp` launcher.
-The launcher exists for the VS Code side and for environments where `coralc` is
-not on `PATH`; users should not have to install it.
+The launcher remains for environments where `coralc` is not on `PATH`; normal
+users do not need to install it.
 
 ### Gotchas that cost real time
 
@@ -108,13 +108,12 @@ the whole file, a mistake takes all settings with it:
 The error names a *type*, never the offending key, so both read as though
 something else is broken.
 
-### Why not a `[language_servers.coral]` entry in `extension.toml`?
+### Why the extension wasm is prebuilt
 
-Zed implements `language_server_command` in a compiled `extension.wasm`, which
-needs the wasi-sdk — a ~100 MB download at extension build time. The whole
-extension is deliberately build-free: the grammar is compiled locally to wasm
-and shipped prebuilt. The settings route keeps that property, so both editors
-install with no network access at all.
+Zed implements `language_server_command` in a compiled `extension.wasm`. We
+build it from `src/lib.rs` with `zed_extension_api`; our release and manual
+installers ship the result so users do not need Rust, clang, or a network
+connection. The registry rebuilds it from source when we publish.
 
 ---
 

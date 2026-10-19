@@ -1,4 +1,4 @@
-; Coral highlights — matches grammars/coral/grammar.js
+; Coral highlights — matches tree-sitter-coral/grammar.js
 ; Node names there: declaration / function_declaration /
 ; variable_declaration / const_declaration / struct_declaration /
 ; field_declaration / method_declaration / enum_declaration /
